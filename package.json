@@ -1,0 +1,33 @@
+{
+  "name": "autopsia-rn",
+  "version": "0.1.0",
+  "description": "Auditor de Clean Architecture para proyectos React Native / TypeScript. ESLint te dice si tu código está bien escrito; Autopsia te dice si tu arquitectura está bien construida.",
+  "bin": {
+    "autopsia": "./dist/index.js"
+  },
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc",
+    "scan:fixture": "tsx src/index.ts scan fixtures/sample-app --config fixtures/sample-app/autopsia.config.json"
+  },
+  "keywords": [
+    "clean-architecture",
+    "react-native",
+    "static-analysis",
+    "architecture",
+    "lint",
+    "ast"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "commander": "^12.1.0",
+    "ts-morph": "^23.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.0"
+  }
+}

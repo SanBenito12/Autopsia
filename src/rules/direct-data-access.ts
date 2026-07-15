@@ -1,0 +1,37 @@
+import { AutopsiaConfig, FileNode, Violation } from '../types';
+
+function matchesModule(imported: string, configured: string): boolean {
+  return imported === configured || imported.startsWith(configured + '/');
+}
+
+/**
+ * Regla 2 — Acceso directo a datos en la UI.
+ * Pantallas/componentes importando axios, fetch wrappers, clientes de
+ * Supabase, etc., saltándose repositorios y casos de uso.
+ */
+export function checkDirectDataAccess(
+  nodes: FileNode[],
+  config: AutopsiaConfig
+): Violation[] {
+  const violations: Violation[] = [];
+  const forbiddenLayers = new Set(config.noDirectDataAccessIn);
+
+  for (const node of nodes) {
+    if (!node.layer || !forbiddenLayers.has(node.layer)) continue;
+
+    for (const ext of node.externalImports) {
+      const hit = config.dataAccessModules.find((m) => matchesModule(ext, m));
+      if (hit) {
+        violations.push({
+          rule: 'direct-data-access',
+          severity: 'error',
+          file: node.path,
+          message: `Acceso directo a datos/red ("${ext}") en capa "${node.layer}"`,
+          detail: 'Debe pasar por un repositorio o caso de uso',
+        });
+      }
+    }
+  }
+
+  return violations;
+}
