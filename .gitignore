@@ -2,3 +2,4 @@ node_modules/
 dist/
 reporte.json
 *.log
+.DS_Store
