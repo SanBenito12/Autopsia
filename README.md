@@ -58,6 +58,8 @@ npm run scan:alias     # fixture con path aliases (@/*) resueltos vía tsconfig
 npm run demo:html      # genera demo/report.html con el visor interactivo
 ```
 
+🔗 **[Ver demo interactivo del grafo](https://sanbenito12.github.io/Autopsia/report.html)** — el visor d3 (force-directed, aristas rojas = violaciones) generado con `--html` sobre el fixture de ejemplo.
+
 ## Reglas implementadas
 
 | Regla | Qué detecta | Severidad |
