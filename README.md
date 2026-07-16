@@ -15,6 +15,16 @@ Auditar manualmente la arquitectura de una app toma horas: abrir cada pantalla, 
 ## Instalación y uso
 
 ```bash
+# Vía npx (próximamente en npm)
+npx autopsia-rn scan ./mi-proyecto
+
+# Genera el config detectando la estructura del proyecto
+npx autopsia-rn init ./mi-proyecto
+```
+
+Desde el repositorio:
+
+```bash
 npm install
 npm run dev -- scan ./mi-proyecto --config autopsia.config.json
 
@@ -118,10 +128,11 @@ src/
 
 - [x] Visor web interactivo del grafo (d3 force-directed, aristas rojas = violaciones) — `--html`
 - [x] Path aliases del tsconfig (`@/*`) resueltos en el grafo — `--tsconfig`
-- [ ] `autopsia init` — generador de config detectando la estructura del proyecto
+- [x] `autopsia init` — generador de config detectando la estructura del proyecto
+- [x] Suite de tests (Vitest) + CI en GitHub Actions
 - [ ] Comparación histórica (`--compare reporte-anterior.json`)
 - [ ] Reglas extra: god files, componentes con lógica de negocio, archivos huérfanos
-- [ ] Publicación en npm (`npx autopsia scan`)
+- [ ] Publicación en npm (`npx autopsia-rn`) — paquete listo, pendiente `npm publish`
 
 ## Stack
 

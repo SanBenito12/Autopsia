@@ -6,10 +6,26 @@
     "autopsia": "./dist/index.js"
   },
   "main": "dist/index.js",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SanBenito12/Autopsia.git"
+  },
+  "bugs": {
+    "url": "https://github.com/SanBenito12/Autopsia/issues"
+  },
+  "homepage": "https://github.com/SanBenito12/Autopsia#readme",
   "scripts": {
     "dev": "tsx src/index.ts",
-    "build": "tsc",
+    "build": "tsc && chmod +x dist/index.js",
     "test": "vitest run",
+    "prepublishOnly": "npm run build && npm test",
     "scan:fixture": "tsx src/index.ts scan fixtures/sample-app --config fixtures/sample-app/autopsia.config.json",
     "scan:alias": "tsx src/index.ts scan fixtures/alias-app --config fixtures/alias-app/autopsia.config.json",
     "demo:html": "tsx src/index.ts scan fixtures/sample-app --config fixtures/sample-app/autopsia.config.json --html demo/report.html"
