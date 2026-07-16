@@ -11,6 +11,7 @@ import { checkForbiddenExternal } from './rules/forbidden-external';
 import { checkCircularDeps } from './rules/circular-deps';
 import { computeHealth, printReport, writeJson } from './reporter';
 import { writeHtml } from './viewer';
+import { runInit } from './init';
 
 const program = new Command();
 
@@ -42,7 +43,7 @@ program
 
     if (!fs.existsSync(configPath)) {
       console.error(chalk.red(`✖ No se encontró el config: ${configPath}`));
-      console.error(chalk.gray('  Genera uno con: autopsia init (próximamente) o crea autopsia.config.json'));
+      console.error(chalk.gray('  Genera uno con: autopsia init <ruta>'));
       process.exit(2);
     }
 
@@ -89,6 +90,19 @@ program
     if (opts.ci && violations.some((v) => v.severity === 'error')) {
       process.exit(1);
     }
+  });
+
+program
+  .command('init')
+  .argument('[path]', 'Ruta del proyecto donde generar el config', '.')
+  .option('--force', 'Sobrescribir autopsia.config.json si ya existe')
+  .action((initPath: string, opts: { force?: boolean }) => {
+    const root = path.resolve(initPath);
+    if (!fs.existsSync(root)) {
+      console.error(chalk.red(`✖ La ruta no existe: ${root}`));
+      process.exit(2);
+    }
+    process.exit(runInit(root, opts.force ?? false));
   });
 
 program.parse();
