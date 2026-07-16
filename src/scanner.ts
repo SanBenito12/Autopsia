@@ -1,4 +1,5 @@
 import { Project, SourceFile } from 'ts-morph';
+import * as fs from 'fs';
 import * as path from 'path';
 import { AutopsiaConfig, FileNode } from './types';
 import { classifyFile } from './classifier';
@@ -48,19 +49,30 @@ function resolveImport(sourceFile: SourceFile, root: string): {
   return { internal, external };
 }
 
-export function buildGraph(root: string, config: AutopsiaConfig): FileNode[] {
+export function buildGraph(root: string, config: AutopsiaConfig, tsconfigPath?: string): FileNode[] {
   const ignore = [...DEFAULT_IGNORE, ...(config.ignore ?? [])];
 
-  const project = new Project({
-    compilerOptions: {
-      allowJs: false,
-      jsx: 4, // react-jsx
-      esModuleInterop: true,
-      resolveJsonModule: true,
-      skipLibCheck: true,
-    },
-    skipAddingFilesFromTsConfig: true,
-  });
+  // Usar el tsconfig del proyecto analizado (si existe) para que ts-morph
+  // resuelva sus path aliases (p. ej. "@/*": ["src/*"]).
+  const resolvedTsconfig = tsconfigPath
+    ? path.resolve(tsconfigPath)
+    : path.join(root, 'tsconfig.json');
+
+  const project = fs.existsSync(resolvedTsconfig)
+    ? new Project({
+        tsConfigFilePath: resolvedTsconfig,
+        skipAddingFilesFromTsConfig: true,
+      })
+    : new Project({
+        compilerOptions: {
+          allowJs: false,
+          jsx: 4, // react-jsx
+          esModuleInterop: true,
+          resolveJsonModule: true,
+          skipLibCheck: true,
+        },
+        skipAddingFilesFromTsConfig: true,
+      });
 
   project.addSourceFilesAtPaths([
     path.join(root, '**/*.ts'),

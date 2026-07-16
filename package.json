@@ -9,7 +9,8 @@
   "scripts": {
     "dev": "tsx src/index.ts",
     "build": "tsc",
-    "scan:fixture": "tsx src/index.ts scan fixtures/sample-app --config fixtures/sample-app/autopsia.config.json"
+    "scan:fixture": "tsx src/index.ts scan fixtures/sample-app --config fixtures/sample-app/autopsia.config.json",
+    "scan:alias": "tsx src/index.ts scan fixtures/alias-app --config fixtures/alias-app/autopsia.config.json"
   },
   "keywords": [
     "clean-architecture",

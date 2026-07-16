@@ -23,8 +23,9 @@ program
   .argument('<path>', 'Ruta del proyecto a analizar')
   .option('-c, --config <file>', 'Ruta al autopsia.config.json', 'autopsia.config.json')
   .option('-o, --output <file>', 'Guardar reporte JSON en esta ruta')
+  .option('--tsconfig <file>', 'Ruta al tsconfig.json del proyecto analizado (default: tsconfig.json en la raíz escaneada)')
   .option('--ci', 'Modo CI: exit code 1 si hay violaciones de severidad error')
-  .action((scanPath: string, opts: { config: string; output?: string; ci?: boolean }) => {
+  .action((scanPath: string, opts: { config: string; output?: string; tsconfig?: string; ci?: boolean }) => {
     const root = path.resolve(scanPath);
     if (!fs.existsSync(root)) {
       console.error(chalk.red(`✖ La ruta no existe: ${root}`));
@@ -45,8 +46,13 @@ program
 
     const config: AutopsiaConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
 
+    if (opts.tsconfig && !fs.existsSync(path.resolve(opts.tsconfig))) {
+      console.error(chalk.red(`✖ No se encontró el tsconfig: ${path.resolve(opts.tsconfig)}`));
+      process.exit(2);
+    }
+
     console.log(chalk.gray(`\n  Escaneando ${root} ...`));
-    const graph = buildGraph(root, config);
+    const graph = buildGraph(root, config, opts.tsconfig);
 
     const violations = [
       ...checkDependencyDirection(graph, config),

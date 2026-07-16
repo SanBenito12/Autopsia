@@ -1,0 +1,22 @@
+{
+  "layers": [
+    {
+      "name": "presentation",
+      "patterns": ["src/presentation/*"],
+      "allowedDependencies": ["domain"]
+    },
+    {
+      "name": "domain",
+      "patterns": ["src/domain/*"],
+      "allowedDependencies": [],
+      "forbiddenExternal": ["react", "react-native", "axios", "@supabase"]
+    },
+    {
+      "name": "data",
+      "patterns": ["src/data/*"],
+      "allowedDependencies": ["domain"]
+    }
+  ],
+  "dataAccessModules": ["axios", "@supabase/supabase-js", "@react-native-async-storage/async-storage"],
+  "noDirectDataAccessIn": ["presentation"]
+}
