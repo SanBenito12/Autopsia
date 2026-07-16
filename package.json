@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "tsx src/index.ts",
     "build": "tsc",
+    "test": "vitest run",
     "scan:fixture": "tsx src/index.ts scan fixtures/sample-app --config fixtures/sample-app/autopsia.config.json",
     "scan:alias": "tsx src/index.ts scan fixtures/alias-app --config fixtures/alias-app/autopsia.config.json",
     "demo:html": "tsx src/index.ts scan fixtures/sample-app --config fixtures/sample-app/autopsia.config.json --html demo/report.html"
@@ -30,6 +31,7 @@
   "devDependencies": {
     "@types/node": "^26.1.1",
     "tsx": "^4.19.0",
-    "typescript": "^5.5.0"
+    "typescript": "^5.5.0",
+    "vitest": "^4.1.10"
   }
 }
