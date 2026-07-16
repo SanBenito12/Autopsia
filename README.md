@@ -1,5 +1,7 @@
 # 🔬 Autopsia
 
+[![CI](https://github.com/SanBenito12/Autopsia/actions/workflows/ci.yml/badge.svg)](https://github.com/SanBenito12/Autopsia/actions/workflows/ci.yml)
+
 ![Demo](docs/demo.png)
 
 > ESLint te dice si tu código está bien escrito. **Autopsia te dice si tu arquitectura está bien construida.**
