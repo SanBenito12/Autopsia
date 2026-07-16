@@ -1,5 +1,6 @@
 node_modules/
 dist/
 reporte.json
+demo/
 *.log
 .DS_Store

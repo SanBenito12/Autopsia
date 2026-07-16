@@ -10,6 +10,7 @@ import { checkDirectDataAccess } from './rules/direct-data-access';
 import { checkForbiddenExternal } from './rules/forbidden-external';
 import { checkCircularDeps } from './rules/circular-deps';
 import { computeHealth, printReport, writeJson } from './reporter';
+import { writeHtml } from './viewer';
 
 const program = new Command();
 
@@ -24,8 +25,9 @@ program
   .option('-c, --config <file>', 'Ruta al autopsia.config.json', 'autopsia.config.json')
   .option('-o, --output <file>', 'Guardar reporte JSON en esta ruta')
   .option('--tsconfig <file>', 'Ruta al tsconfig.json del proyecto analizado (default: tsconfig.json en la raíz escaneada)')
+  .option('--html <file>', 'Generar visor HTML interactivo del grafo en esta ruta')
   .option('--ci', 'Modo CI: exit code 1 si hay violaciones de severidad error')
-  .action((scanPath: string, opts: { config: string; output?: string; tsconfig?: string; ci?: boolean }) => {
+  .action((scanPath: string, opts: { config: string; output?: string; tsconfig?: string; html?: string; ci?: boolean }) => {
     const root = path.resolve(scanPath);
     if (!fs.existsSync(root)) {
       console.error(chalk.red(`✖ La ruta no existe: ${root}`));
@@ -81,6 +83,8 @@ program
     printReport(result);
 
     if (opts.output) writeJson(result, opts.output);
+
+    if (opts.html) writeHtml(result, opts.html);
 
     if (opts.ci && violations.some((v) => v.severity === 'error')) {
       process.exit(1);
