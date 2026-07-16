@@ -49,6 +49,16 @@ npm run demo:html      # genera demo/report.html con el visor interactivo
 
 Los imports `import type` se **excluyen** de las reglas de dependencia (no generan acoplamiento en runtime). Los barrels (`index.ts`) se resuelven al archivo real para que no "laven" violaciones.
 
+## Probado en proyectos reales
+
+Escaneé una app React Native **en producción** (~130 archivos, con múltiples roles de usuario) para validar la herramienta fuera de los fixtures:
+
+- **25 violaciones detectadas en menos de 2 segundos**, todas de `dependency-direction`: hooks y contexts de la capa `presentation` importando `data/sources` directamente, saltándose la capa `domain`.
+- **Cero falsos positivos**, y cero violaciones de `direct-data-access` — el acceso a red ya estaba correctamente centralizado en `data`, y Autopsia lo confirmó en lugar de inventar ruido.
+- El reporte reveló un **alto fan-in**: solo 3 servicios (`auth`, `usersgestor`, `invitations`) concentran ~50% de las violaciones. Eso convierte el reporte en un plan de refactor priorizado: atacar esos 3 archivos primero resuelve la mitad del problema.
+
+![Reporte real](docs/case-study.png)
+
 ## Configuración
 
 `autopsia.config.json` define tus capas por patrones de ruta y sus reglas:
