@@ -1,5 +1,7 @@
 # 🔬 Autopsia
 
+![Demo](docs/demo.png)
+
 > ESLint te dice si tu código está bien escrito. **Autopsia te dice si tu arquitectura está bien construida.**
 
 CLI de análisis estático que audita proyectos **React Native / TypeScript** contra las reglas de **Clean Architecture**: construye el grafo de dependencias vía AST y detecta violaciones entre capas en segundos.
@@ -19,12 +21,21 @@ npm run dev -- scan ./mi-proyecto -o reporte.json
 
 # Modo CI (exit code 1 si hay violaciones → quality gate)
 npm run dev -- scan ./mi-proyecto --ci
+
+# Proyectos con path aliases (@/domain/...): se usa el tsconfig.json de la
+# raíz escaneada automáticamente, o indica uno explícito
+npm run dev -- scan ./mi-proyecto --tsconfig ./mi-proyecto/tsconfig.app.json
+
+# Visor HTML interactivo del grafo (d3 force-directed, dark theme)
+npm run dev -- scan ./mi-proyecto --html reporte.html
 ```
 
-Prueba rápida con el fixture incluido:
+Prueba rápida con los fixtures incluidos:
 
 ```bash
-npm run scan:fixture
+npm run scan:fixture   # fixture clásico con las 4 reglas
+npm run scan:alias     # fixture con path aliases (@/*) resueltos vía tsconfig
+npm run demo:html      # genera demo/report.html con el visor interactivo
 ```
 
 ## Reglas implementadas
@@ -83,6 +94,7 @@ src/
 ├── scanner.ts        # Grafo de dependencias vía AST (ts-morph)
 ├── classifier.ts     # Clasificación de archivos en capas
 ├── reporter.ts       # Salida terminal + JSON + métricas de salud
+├── viewer.ts         # Visor HTML interactivo del grafo (d3)
 └── rules/
     ├── dependency-direction.ts
     ├── direct-data-access.ts
@@ -92,7 +104,8 @@ src/
 
 ## Roadmap
 
-- [ ] Visor web interactivo del grafo (d3 force-directed, aristas rojas = violaciones)
+- [x] Visor web interactivo del grafo (d3 force-directed, aristas rojas = violaciones) — `--html`
+- [x] Path aliases del tsconfig (`@/*`) resueltos en el grafo — `--tsconfig`
 - [ ] `autopsia init` — generador de config detectando la estructura del proyecto
 - [ ] Comparación histórica (`--compare reporte-anterior.json`)
 - [ ] Reglas extra: god files, componentes con lógica de negocio, archivos huérfanos
