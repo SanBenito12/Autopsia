@@ -1,6 +1,7 @@
 # 🔬 Autopsia
 
 [![CI](https://github.com/SanBenito12/Autopsia/actions/workflows/ci.yml/badge.svg)](https://github.com/SanBenito12/Autopsia/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/autopsia-rn)](https://www.npmjs.com/package/autopsia-rn)
 
 ![Demo](docs/demo.png)
 
@@ -14,32 +15,39 @@ Auditar manualmente la arquitectura de una app toma horas: abrir cada pantalla, 
 
 ## Instalación y uso
 
-```bash
-# Vía npx (próximamente en npm)
-npx autopsia-rn scan ./mi-proyecto
+Sin instalar nada, con `npx`:
 
-# Genera el config detectando la estructura del proyecto
-npx autopsia-rn init ./mi-proyecto
+```bash
+npx autopsia-rn init        # genera el config detectando tus capas
+npx autopsia-rn scan .      # audita el proyecto
 ```
 
-Desde el repositorio:
+Opciones de `scan`:
 
 ```bash
-npm install
-npm run dev -- scan ./mi-proyecto --config autopsia.config.json
-
-# Con reporte JSON
-npm run dev -- scan ./mi-proyecto -o reporte.json
-
-# Modo CI (exit code 1 si hay violaciones → quality gate)
-npm run dev -- scan ./mi-proyecto --ci
+npx autopsia-rn scan . -o reporte.json       # guardar reporte JSON
+npx autopsia-rn scan . --ci                  # exit code 1 si hay violaciones → quality gate
+npx autopsia-rn scan . --html reporte.html   # visor HTML interactivo del grafo (d3, dark theme)
 
 # Proyectos con path aliases (@/domain/...): se usa el tsconfig.json de la
 # raíz escaneada automáticamente, o indica uno explícito
-npm run dev -- scan ./mi-proyecto --tsconfig ./mi-proyecto/tsconfig.app.json
+npx autopsia-rn scan . --tsconfig ./tsconfig.app.json
+```
 
-# Visor HTML interactivo del grafo (d3 force-directed, dark theme)
-npm run dev -- scan ./mi-proyecto --html reporte.html
+Instalación global:
+
+```bash
+npm i -g autopsia-rn
+autopsia scan .
+```
+
+Para desarrollo, clonando el repo:
+
+```bash
+git clone https://github.com/SanBenito12/Autopsia.git
+cd Autopsia
+npm install
+npm run dev -- scan ./mi-proyecto --config autopsia.config.json
 ```
 
 Prueba rápida con los fixtures incluidos:
@@ -132,7 +140,7 @@ src/
 - [x] Suite de tests (Vitest) + CI en GitHub Actions
 - [ ] Comparación histórica (`--compare reporte-anterior.json`)
 - [ ] Reglas extra: god files, componentes con lógica de negocio, archivos huérfanos
-- [ ] Publicación en npm (`npx autopsia-rn`) — paquete listo, pendiente `npm publish`
+- [x] Publicación en npm — [`autopsia-rn`](https://www.npmjs.com/package/autopsia-rn)
 
 ## Stack
 
