@@ -15,6 +15,9 @@ export interface LayerConfig {
   forbiddenExternal?: string[];
 }
 
+/** Nivel de una regla: error (default, falla --ci), warning (no falla) u off */
+export type RuleLevel = 'error' | 'warning' | 'off';
+
 export interface AutopsiaConfig {
   layers: LayerConfig[];
   /** Módulos externos que se consideran "acceso directo a datos/red" */
@@ -23,6 +26,8 @@ export interface AutopsiaConfig {
   noDirectDataAccessIn: string[];
   /** Carpetas a ignorar */
   ignore?: string[];
+  /** Severidad por regla. Si se omite, todas corren como "error". */
+  rules?: Record<string, RuleLevel>;
 }
 
 /**

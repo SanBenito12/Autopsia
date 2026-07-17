@@ -6,10 +6,7 @@ import * as path from 'path';
 import { AutopsiaConfig, ScanResult, Violation } from './types';
 import { applyBaseline, loadBaseline, printBaselineSaved, saveBaseline } from './baseline';
 import { buildGraph } from './scanner';
-import { checkDependencyDirection } from './rules/dependency-direction';
-import { checkDirectDataAccess } from './rules/direct-data-access';
-import { checkForbiddenExternal } from './rules/forbidden-external';
-import { checkCircularDeps } from './rules/circular-deps';
+import { runRules } from './rules/run';
 import { computeHealth, printReport, writeJson } from './reporter';
 import { writeHtml } from './viewer';
 import { runInit } from './init';
@@ -60,12 +57,7 @@ program
     console.log(chalk.gray(`\n  Escaneando ${root} ...`));
     const graph = buildGraph(root, config, opts.tsconfig);
 
-    const rawViolations = [
-      ...checkDependencyDirection(graph, config),
-      ...checkDirectDataAccess(graph, config),
-      ...checkForbiddenExternal(graph, config),
-      ...checkCircularDeps(graph),
-    ];
+    const rawViolations = runRules(graph, config);
 
     // Comentarios autopsia-ignore: las suprimidas solo se cuentan
     const suppressedCount = rawViolations.filter((v) => v.suppressed).length;

@@ -1,7 +1,8 @@
 import chalk from 'chalk';
 import * as fs from 'fs';
 import * as path from 'path';
-import { AutopsiaConfig, LayerConfig } from './types';
+import { AutopsiaConfig, LayerConfig, RuleLevel } from './types';
+import { ALL_RULES } from './rules/run';
 
 /**
  * `autopsia init` — genera un autopsia.config.json detectando la estructura
@@ -72,10 +73,14 @@ export function buildConfig(detected: DetectedLayer[]): AutopsiaConfig {
     return layer;
   });
 
+  const rules: Record<string, RuleLevel> = {};
+  for (const rule of ALL_RULES) rules[rule] = 'error';
+
   return {
     layers,
     dataAccessModules: [...DEFAULT_DATA_ACCESS],
     noDirectDataAccessIn: detectedNames.has('presentation') ? ['presentation'] : [],
+    rules,
   };
 }
 
@@ -136,6 +141,8 @@ export function runInit(root: string, force = false): number {
   }
 
   console.log(chalk.bold(`\n  Config generado en ${result.configPath}`));
+  console.log(chalk.gray('  Sección "rules": cada regla acepta "error" (falla --ci),'));
+  console.log(chalk.gray('  "warning" (se reporta en amarillo, no falla) u "off" (no corre).'));
   console.log(chalk.gray(`  Pruébalo con: autopsia scan ${root}`));
   console.log('');
   return 0;

@@ -65,7 +65,10 @@ export function printReport(result: ScanResult): void {
   }
 
   for (const [rule, violations] of byRule) {
-    console.log(chalk.bold.red(`  ✖ ${rule}`) + chalk.gray(` — ${violations.length} violación(es)`));
+    // Las reglas configuradas como "warning" se reportan en amarillo y no fallan --ci
+    const isWarning = violations.every((v) => v.severity === 'warning');
+    const header = isWarning ? chalk.bold.yellow(`  ⚠ ${rule}`) : chalk.bold.red(`  ✖ ${rule}`);
+    console.log(header + chalk.gray(` — ${violations.length} violación(es)`));
     for (const v of violations) {
       console.log(`    ${chalk.cyan(v.file)}`);
       console.log(`      ${v.message}`);
