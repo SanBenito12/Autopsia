@@ -1,11 +1,93 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="utf-8">
-  <meta http-equiv="refresh" content="0; url=report.html">
-  <title>Autopsia — demo del visor</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Autopsia — auditor de Clean Architecture para React Native</title>
+<meta name="description" content="CLI que audita proyectos React Native / TypeScript contra Clean Architecture: encuentra los imports que rompen tus capas, en segundos.">
+<style>
+  :root {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --surface-2: #222220;
+    --ink: #ffffff;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --hairline: rgba(255, 255, 255, 0.10);
+    --violation: #e34948;
+    --good: #0ca30c;
+    --accent: #3987e5;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--page);
+    color: var(--ink-2);
+    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 48px 20px;
+  }
+  main { max-width: 640px; width: 100%; }
+  h1 { color: var(--ink); font-size: 40px; letter-spacing: -0.01em; }
+  .tagline { margin-top: 10px; font-size: 18px; }
+  .tagline strong { color: var(--ink); font-weight: 650; }
+  .quick {
+    margin-top: 28px;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: 10px;
+    padding: 16px 18px;
+    font: 14px/1.9 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  .quick .c { color: var(--muted); }
+  .quick .p { color: var(--good); user-select: none; }
+  nav { margin-top: 32px; display: grid; gap: 10px; }
+  nav a {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: 10px;
+    padding: 14px 18px;
+    text-decoration: none;
+    color: var(--ink);
+    font-weight: 600;
+  }
+  nav a:hover { background: var(--surface-2); border-color: var(--accent); }
+  nav a.demo { border-color: var(--accent); }
+  nav a .desc { color: var(--muted); font-weight: 400; font-size: 14px; }
+  nav a .ico { flex: none; width: 1.4em; text-align: center; }
+  footer { margin-top: 40px; font-size: 13px; color: var(--muted); }
+  footer a { color: var(--muted); }
+</style>
 </head>
 <body>
-  <p><a href="report.html">Ver el demo interactivo del grafo de Autopsia</a></p>
+<main>
+  <h1>🔬 Autopsia</h1>
+  <p class="tagline">ESLint te dice si tu código está bien escrito. <strong>Autopsia te dice si tu arquitectura está bien construida.</strong> Auditor de Clean Architecture para React Native / TypeScript.</p>
+
+  <div class="quick">
+    <div><span class="p">$</span> npx autopsia-rn init <span class="c"># detecta tus capas</span></div>
+    <div><span class="p">$</span> npx autopsia-rn scan . <span class="c"># audita el proyecto</span></div>
+    <div><span class="p">$</span> npx autopsia-rn scan . --html --open <span class="c"># grafo interactivo</span></div>
+  </div>
+
+  <nav>
+    <a class="demo" href="report.html"><span class="ico">🕸</span> Demo interactivo del grafo <span class="desc">el visor de --html, en vivo</span></a>
+    <a href="https://github.com/SanBenito12/Autopsia/blob/main/docs/getting-started.md"><span class="ico">📖</span> Getting started <span class="desc">de cero a tu primer scan, paso a paso</span></a>
+    <a href="https://github.com/SanBenito12/Autopsia/blob/main/docs/rules.md"><span class="ico">📏</span> Reglas <span class="desc">código malo, fix y por qué importa</span></a>
+    <a href="https://github.com/SanBenito12/Autopsia/blob/main/docs/configuration.md"><span class="ico">⚙️</span> Configuración <span class="desc">capas, severidad, baseline</span></a>
+    <a href="https://github.com/SanBenito12/Autopsia"><span class="ico">⭐</span> Repositorio en GitHub <span class="desc">código, issues, contribuir</span></a>
+    <a href="https://www.npmjs.com/package/autopsia-rn"><span class="ico">📦</span> autopsia-rn en npm <span class="desc">npx autopsia-rn, sin instalar</span></a>
+  </nav>
+
+  <footer>MIT · hecho con ts-morph, commander y d3 · <a href="https://github.com/SanBenito12/Autopsia/blob/main/README.es.md">README en español</a></footer>
+</main>
 </body>
 </html>

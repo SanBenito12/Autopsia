@@ -16,10 +16,22 @@ const program = new Command();
 program
   .name('autopsia')
   .description('Auditor de Clean Architecture para proyectos React Native / TypeScript')
-  .version('0.1.0');
+  .version('0.1.0')
+  .addHelpText(
+    'after',
+    `
+Ejemplos:
+  $ autopsia init                     genera autopsia.config.json detectando tus capas
+  $ autopsia scan .                   audita el proyecto actual
+  $ autopsia scan . --html --open     abre el grafo interactivo en el navegador
+  $ autopsia scan . --update-baseline tolera las violaciones actuales (proyectos legacy)
+
+Guía completa: https://github.com/SanBenito12/Autopsia#readme`
+  );
 
 program
   .command('scan')
+  .description('Audita el proyecto contra las reglas de Clean Architecture de tu config')
   .argument('<path>', 'Ruta del proyecto a analizar')
   .option('-c, --config <file>', 'Ruta al autopsia.config.json', 'autopsia.config.json')
   .option('-o, --output <file>', 'Guardar reporte JSON en esta ruta')
@@ -29,6 +41,15 @@ program
   .option('--ci', 'Modo CI: exit code 1 si hay violaciones de severidad error')
   .option('--update-baseline', 'Guardar las violaciones actuales en autopsia-baseline.json como toleradas')
   .option('--no-baseline', 'Ignorar el baseline existente en este scan')
+  .addHelpText(
+    'after',
+    `
+Ejemplos:
+  $ autopsia scan .                     audita el directorio actual
+  $ autopsia scan . --html --open       genera y abre el grafo interactivo
+  $ autopsia scan . --update-baseline   tolera las violaciones actuales; solo fallará lo nuevo
+  $ autopsia scan . --ci                exit code 1 si hay violaciones (nuevas) de severidad error`
+  )
   .action((scanPath: string, opts: { config: string; output?: string; tsconfig?: string; html?: string | boolean; open?: boolean; ci?: boolean; updateBaseline?: boolean; baseline: boolean }) => {
     const root = path.resolve(scanPath);
     if (!fs.existsSync(root)) {
@@ -43,8 +64,10 @@ program
         : path.resolve(opts.config);
 
     if (!fs.existsSync(configPath)) {
-      console.error(chalk.red(`✖ No se encontró el config: ${configPath}`));
-      console.error(chalk.gray('  Genera uno con: autopsia init <ruta>'));
+      console.error(chalk.red(`✖ No se encontró autopsia.config.json en ${root}`));
+      console.error(chalk.gray('  Genera uno (detecta tus capas automáticamente) y vuelve a escanear:'));
+      console.error(chalk.bold(`    npx autopsia-rn init ${scanPath}`));
+      console.error(chalk.bold(`    npx autopsia-rn scan ${scanPath}`));
       process.exit(2);
     }
 
@@ -124,6 +147,7 @@ program
 
 program
   .command('init')
+  .description('Genera autopsia.config.json detectando las capas de tu proyecto bajo src/')
   .argument('[path]', 'Ruta del proyecto donde generar el config', '.')
   .option('--force', 'Sobrescribir autopsia.config.json si ya existe')
   .action((initPath: string, opts: { force?: boolean }) => {

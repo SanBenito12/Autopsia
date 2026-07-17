@@ -2,113 +2,39 @@
 
 [![CI](https://github.com/SanBenito12/Autopsia/actions/workflows/ci.yml/badge.svg)](https://github.com/SanBenito12/Autopsia/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/autopsia-rn)](https://www.npmjs.com/package/autopsia-rn)
+![license](https://img.shields.io/badge/license-MIT-green)
+
+**🇪🇸 [Leer en español](README.es.md)**
+
+A CLI that audits your **React Native / TypeScript** project against **Clean Architecture** rules — it finds the imports that break your layers, in seconds.
 
 ![Demo](docs/demo.png)
 
-> ESLint te dice si tu código está bien escrito. **Autopsia te dice si tu arquitectura está bien construida.**
+## Why?
 
-CLI de análisis estático que audita proyectos **React Native / TypeScript** contra las reglas de **Clean Architecture**: construye el grafo de dependencias vía AST y detecta violaciones entre capas en segundos.
+Somebody ships a screen that calls `axios.get()` directly. It works, everyone moves on. Six months later you can't write a test for that screen without mocking the network, and when the API changes you're hunting through 40 UI files instead of one repository. Autopsia catches that import the day it appears — like ESLint, but for your architecture instead of your syntax.
 
-## ¿Por qué?
+*New to Clean Architecture? There's a [10-line explanation with a diagram](docs/getting-started.md#what-is-clean-architecture) in the guide — the short version: UI code shouldn't talk to the network directly, and your business logic shouldn't know React exists.*
 
-Auditar manualmente la arquitectura de una app toma horas: abrir cada pantalla, revisar sus imports, rastrear si un `axios.get` se coló en la UI. Autopsia automatiza exactamente ese proceso. Nació de una auditoría manual a una app en producción donde encontré 6 pantallas importando la capa de datos directamente — esta herramienta lo detecta en menos de un segundo.
+## Quick Start
 
-## Instalación y uso
-
-Sin instalar nada, con `npx`:
+Three commands, no install:
 
 ```bash
-npx autopsia-rn init        # genera el config detectando tus capas
-npx autopsia-rn scan .      # audita el proyecto
+npx autopsia-rn init          # 1. detects your layers, writes autopsia.config.json
+npx autopsia-rn scan .        # 2. audits the project
+npx autopsia-rn scan . --html --open   # 3. opens the interactive dependency graph
 ```
 
-Opciones de `scan`:
-
-```bash
-npx autopsia-rn scan . -o reporte.json       # guardar reporte JSON
-npx autopsia-rn scan . --ci                  # exit code 1 si hay violaciones → quality gate
-npx autopsia-rn scan . --html reporte.html   # visor HTML interactivo del grafo (d3, dark theme)
-
-# Proyectos con path aliases (@/domain/...): se usa el tsconfig.json de la
-# raíz escaneada automáticamente, o indica uno explícito
-npx autopsia-rn scan . --tsconfig ./tsconfig.app.json
-```
-
-Instalación global:
-
-```bash
-npm i -g autopsia-rn
-autopsia scan .
-```
-
-Para desarrollo, clonando el repo:
-
-```bash
-git clone https://github.com/SanBenito12/Autopsia.git
-cd Autopsia
-npm install
-npm run dev -- scan ./mi-proyecto --config autopsia.config.json
-```
-
-Prueba rápida con los fixtures incluidos:
-
-```bash
-npm run scan:fixture   # fixture clásico con las 4 reglas
-npm run scan:alias     # fixture con path aliases (@/*) resueltos vía tsconfig
-npm run demo:html      # genera demo/report.html con el visor interactivo
-```
-
-🔗 **[Ver demo interactivo del grafo](https://sanbenito12.github.io/Autopsia/report.html)** — el visor d3 (force-directed, aristas rojas = violaciones) generado con `--html` sobre el fixture de ejemplo.
-
-## Reglas implementadas
-
-| Regla | Qué detecta | Severidad |
-|---|---|---|
-| `dependency-direction` | Capas dependiendo de capas prohibidas (ej. `domain → data`) | error |
-| `direct-data-access` | Pantallas/UI llamando axios, Supabase, AsyncStorage directamente | error |
-| `forbidden-external` | Domain contaminado con React, react-native, axios, etc. | error |
-| `circular-deps` | Ciclos de imports (A → B → A), directos o transitivos | error |
-
-Los imports `import type` se **excluyen** de las reglas de dependencia (no generan acoplamiento en runtime). Los barrels (`index.ts`) se resuelven al archivo real para que no "laven" violaciones.
-
-## Probado en proyectos reales
-
-Escaneé una app React Native **en producción** (~130 archivos, con múltiples roles de usuario) para validar la herramienta fuera de los fixtures:
-
-- **25 violaciones detectadas en menos de 2 segundos**, todas de `dependency-direction`: hooks y contexts de la capa `presentation` importando `data/sources` directamente, saltándose la capa `domain`.
-- **Cero falsos positivos**, y cero violaciones de `direct-data-access` — el acceso a red ya estaba correctamente centralizado en `data`, y Autopsia lo confirmó en lugar de inventar ruido.
-- El reporte reveló un **alto fan-in**: solo 3 servicios (`auth`, `usersgestor`, `invitations`) concentran ~50% de las violaciones. Eso convierte el reporte en un plan de refactor priorizado: atacar esos 3 archivos primero resuelve la mitad del problema.
-
-![Reporte real](docs/case-study.png)
-
-## Configuración
-
-`autopsia.config.json` define tus capas por patrones de ruta y sus reglas:
-
-```json
-{
-  "layers": [
-    { "name": "presentation", "patterns": ["src/presentation/*"], "allowedDependencies": ["domain"] },
-    { "name": "domain", "patterns": ["src/domain/*"], "allowedDependencies": [], "forbiddenExternal": ["react", "react-native", "axios", "@supabase"] },
-    { "name": "data", "patterns": ["src/data/*"], "allowedDependencies": ["domain", "infrastructure"] },
-    { "name": "infrastructure", "patterns": ["src/infrastructure/*"], "allowedDependencies": [] }
-  ],
-  "dataAccessModules": ["axios", "@supabase/supabase-js", "@react-native-async-storage/async-storage"],
-  "noDirectDataAccessIn": ["presentation"]
-}
-```
-
-## Ejemplo de salida
+What you'll see:
 
 ```
-  🔬 AUTOPSIA — Reporte de arquitectura
-  ./sample-app · 8 archivos analizados
+  🔬 AUTOPSIA — Architecture report
+  . · 8 files analyzed
 
   Salud por capa
   presentation     ██████████░░░░░░░░░░ 50% (4 archivos)
   domain           ██████████░░░░░░░░░░ 50% (2 archivos)
-  data             ████████████████████ 100% (1 archivos)
-  infrastructure   ████████████████████ 100% (1 archivos)
 
   ✖ direct-data-access — 1 violación(es)
     src/presentation/screens/HomeScreen.tsx
@@ -118,36 +44,78 @@ Escaneé una app React Native **en producción** (~130 archivos, con múltiples 
   Total: 5 violaciones en 3 archivos
 ```
 
-## Arquitectura
+If `init` doesn't recognize your folder structure, it writes an example config — adjusting it takes a minute with the [configuration guide](docs/configuration.md).
 
+## Already have violations? (every real project does)
+
+You don't have to fix 25 violations before adopting the tool. Record what exists today as a **baseline**; from then on only **new** violations fail:
+
+```bash
+npx autopsia-rn scan . --update-baseline   # tolerates everything that exists today
+npx autopsia-rn scan . --ci                # ✅ passes — will only fail on NEW violations
 ```
-src/
-├── index.ts          # CLI (commander)
-├── scanner.ts        # Grafo de dependencias vía AST (ts-morph)
-├── classifier.ts     # Clasificación de archivos en capas
-├── reporter.ts       # Salida terminal + JSON + métricas de salud
-├── viewer.ts         # Visor HTML interactivo del grafo (d3)
-└── rules/
-    ├── dependency-direction.ts
-    ├── direct-data-access.ts
-    ├── forbidden-external.ts
-    └── circular-deps.ts    # DFS con detección de back-edges
+
+Commit `autopsia-baseline.json` and your legacy debt stops screaming at you while you pay it down. Details in the [getting started guide](docs/getting-started.md#adopting-autopsia-in-a-legacy-project).
+
+## Interactive graph
+
+`--html --open` generates a self-contained viewer: force-directed dependency graph, one color per layer, red edges for violating imports.
+
+🔗 **[Live demo](https://sanbenito12.github.io/Autopsia/report.html)** · [docs site](https://sanbenito12.github.io/Autopsia/)
+
+## Rules
+
+| Rule | What it catches |
+|---|---|
+| [`dependency-direction`](docs/rules.md#dependency-direction) | A layer importing from a layer it shouldn't (e.g. `domain → data`) |
+| [`direct-data-access`](docs/rules.md#direct-data-access) | Screens/UI calling axios, Supabase, AsyncStorage directly |
+| [`forbidden-external`](docs/rules.md#forbidden-external) | Domain contaminated with React, react-native, axios, … |
+| [`circular-deps`](docs/rules.md#circular-deps) | Import cycles (A → B → A), direct or transitive |
+
+Every rule can be set to `"error"`, `"warning"` or `"off"` per project, and any single violation can be suppressed with a documented `// autopsia-ignore-next-line` comment. The [rules guide](docs/rules.md) shows bad code, the fix, and why it matters — for each rule.
+
+## CI
+
+Fail the build only on new violations:
+
+```yaml
+steps:
+  - uses: actions/checkout@v4
+  - uses: actions/setup-node@v4
+    with: { node-version: 20 }
+  - run: npx autopsia-rn scan . --ci
 ```
+
+Full recipe (with baseline and PR comments): [docs/ci.md](docs/ci.md).
+
+## Tested on a real production app
+
+Scanned a production React Native app (~130 files): **25 violations in under 2 seconds, zero false positives**. 3 files concentrated ~50% of the violations — the report doubles as a prioritized refactor plan.
+
+![Real report](docs/case-study.png)
+
+## Documentation
+
+- 📖 [Getting started](docs/getting-started.md) — step by step, with real output, plus a crash intro to Clean Architecture
+- 📏 [Rules](docs/rules.md) — bad example, good example, and how to ignore each rule legitimately
+- ⚙️ [Configuration](docs/configuration.md) — every field of `autopsia.config.json`
+- 🤖 [CI](docs/ci.md) — GitHub Actions recipe with baseline
 
 ## Roadmap
 
-- [x] Visor web interactivo del grafo (d3 force-directed, aristas rojas = violaciones) — `--html`
-- [x] Path aliases del tsconfig (`@/*`) resueltos en el grafo — `--tsconfig`
-- [x] `autopsia init` — generador de config detectando la estructura del proyecto
-- [x] Suite de tests (Vitest) + CI en GitHub Actions
-- [ ] Comparación histórica (`--compare reporte-anterior.json`)
-- [ ] Reglas extra: god files, componentes con lógica de negocio, archivos huérfanos
-- [x] Publicación en npm — [`autopsia-rn`](https://www.npmjs.com/package/autopsia-rn)
+- [x] Interactive graph viewer (`--html --open`)
+- [x] tsconfig path aliases (`@/*`) resolved in the graph
+- [x] `autopsia init` — config generator that detects your structure
+- [x] Baseline for legacy projects (`--update-baseline`)
+- [x] `autopsia-ignore` escape comments
+- [x] Per-rule severity (`error` / `warning` / `off`)
+- [ ] Historical comparison (`--compare previous-report.json`)
+- [ ] More rules: god files, business logic in components, orphan files
 
 ## Stack
 
 Node · TypeScript · ts-morph (AST) · commander · chalk
 
-## Licencia
+## License
 
 MIT
