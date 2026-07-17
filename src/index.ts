@@ -32,7 +32,7 @@ Guía completa: https://github.com/SanBenito12/Autopsia#readme`
 program
   .command('scan')
   .description('Audita el proyecto contra las reglas de Clean Architecture de tu config')
-  .argument('<path>', 'Ruta del proyecto a analizar')
+  .argument('[path]', 'Ruta del proyecto a analizar', '.')
   .option('-c, --config <file>', 'Ruta al autopsia.config.json', 'autopsia.config.json')
   .option('-o, --output <file>', 'Guardar reporte JSON en esta ruta')
   .option('--tsconfig <file>', 'Ruta al tsconfig.json del proyecto analizado (default: tsconfig.json en la raíz escaneada)')
@@ -45,7 +45,7 @@ program
     'after',
     `
 Ejemplos:
-  $ autopsia scan .                     audita el directorio actual
+  $ autopsia scan                       audita el directorio actual (path default: ".")
   $ autopsia scan . --html --open       genera y abre el grafo interactivo
   $ autopsia scan . --update-baseline   tolera las violaciones actuales; solo fallará lo nuevo
   $ autopsia scan . --ci                exit code 1 si hay violaciones (nuevas) de severidad error`
