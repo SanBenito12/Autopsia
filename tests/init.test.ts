@@ -59,7 +59,7 @@ describe('detectLayers', () => {
 });
 
 describe('buildConfig', () => {
-  it('genera reglas por defecto: presentation→domain, data→domain+infrastructure, domain sin deps', () => {
+  it('genera reglas por defecto: dependencias hacia adentro (todas → domain)', () => {
     mkdirs('src/presentation', 'src/domain', 'src/data', 'src/infrastructure');
     const config = buildConfig(detectLayers(tmpRoot));
 
@@ -68,7 +68,9 @@ describe('buildConfig', () => {
     expect(byName['domain'].allowedDependencies).toEqual([]);
     expect(byName['domain'].forbiddenExternal).toEqual(['react', 'react-native', 'axios', '@supabase']);
     expect(byName['data'].allowedDependencies).toEqual(['domain', 'infrastructure']);
-    expect(byName['infrastructure'].allowedDependencies).toEqual([]);
+    // infrastructure implementa contratos del domain (RepositoryImpl importa
+    // interfaces y errores) — prohibirlo generaba falsos positivos masivos
+    expect(byName['infrastructure'].allowedDependencies).toEqual(['domain']);
     expect(config.noDirectDataAccessIn).toEqual(['presentation']);
     expect(config.dataAccessModules).toContain('axios');
   });
