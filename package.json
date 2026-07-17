@@ -1,6 +1,6 @@
 {
   "name": "autopsia-rn",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Auditor de Clean Architecture para proyectos React Native / TypeScript. ESLint te dice si tu código está bien escrito; Autopsia te dice si tu arquitectura está bien construida.",
   "bin": {
     "autopsia": "dist/index.js"
@@ -8,7 +8,9 @@
   "main": "dist/index.js",
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md",
+    "README.es.md"
   ],
   "engines": {
     "node": ">=18"
