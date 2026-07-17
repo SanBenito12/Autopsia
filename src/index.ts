@@ -16,7 +16,7 @@ const program = new Command();
 program
   .name('autopsia')
   .description('Auditor de Clean Architecture para proyectos React Native / TypeScript')
-  .version('0.2.0')
+  .version('0.2.1')
   .addHelpText(
     'after',
     `
