@@ -53,7 +53,10 @@ export interface ScanResult {
   root: string;
   totalFiles: number;
   filesByLayer: Record<string, number>;
+  /** Violaciones activas (nuevas respecto al baseline, si existe) */
   violations: Violation[];
+  /** Violaciones ya registradas en autopsia-baseline.json — no fallan --ci */
+  tolerated?: Violation[];
   healthByLayer: Record<string, number>;
   graph: FileNode[];
 }

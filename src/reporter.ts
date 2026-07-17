@@ -44,8 +44,10 @@ export function printReport(result: ScanResult): void {
   }
   console.log('');
 
+  const tolerated = result.tolerated ?? [];
+
   // Violaciones agrupadas por regla
-  if (result.violations.length === 0) {
+  if (result.violations.length === 0 && tolerated.length === 0) {
     console.log(chalk.green.bold('  ✔ Sin violaciones. Arquitectura sana.'));
     console.log('');
     return;
@@ -66,6 +68,17 @@ export function printReport(result: ScanResult): void {
     console.log('');
   }
 
+  // Toleradas por el baseline: en gris, no cuentan para --ci
+  if (tolerated.length > 0) {
+    console.log(
+      chalk.gray(`  ⊘ toleradas (baseline) — ${tolerated.length} violación(es) ya registradas`)
+    );
+    for (const v of tolerated) {
+      console.log(chalk.gray(`    ${v.file} · ${v.rule}`));
+    }
+    console.log('');
+  }
+
   // Top archivos problemáticos
   const countByFile = new Map<string, number>();
   for (const v of result.violations) {
@@ -80,9 +93,17 @@ export function printReport(result: ScanResult): void {
     console.log('');
   }
 
-  console.log(
-    chalk.bold(`  Total: ${chalk.red(result.violations.length + ' violaciones')} en ${countByFile.size} archivos`)
-  );
+  if (result.tolerated) {
+    const freshLabel =
+      result.violations.length > 0
+        ? chalk.red(`${result.violations.length} nuevas`)
+        : chalk.green('0 nuevas');
+    console.log(chalk.bold(`  Total: ${freshLabel} · ${chalk.gray(`${tolerated.length} toleradas (baseline)`)}`));
+  } else {
+    console.log(
+      chalk.bold(`  Total: ${chalk.red(result.violations.length + ' violaciones')} en ${countByFile.size} archivos`)
+    );
+  }
   console.log('');
 }
 

@@ -3,7 +3,8 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import * as fs from 'fs';
 import * as path from 'path';
-import { AutopsiaConfig, ScanResult } from './types';
+import { AutopsiaConfig, ScanResult, Violation } from './types';
+import { applyBaseline, loadBaseline, printBaselineSaved, saveBaseline } from './baseline';
 import { buildGraph } from './scanner';
 import { checkDependencyDirection } from './rules/dependency-direction';
 import { checkDirectDataAccess } from './rules/direct-data-access';
@@ -28,7 +29,9 @@ program
   .option('--tsconfig <file>', 'Ruta al tsconfig.json del proyecto analizado (default: tsconfig.json en la raíz escaneada)')
   .option('--html <file>', 'Generar visor HTML interactivo del grafo en esta ruta')
   .option('--ci', 'Modo CI: exit code 1 si hay violaciones de severidad error')
-  .action((scanPath: string, opts: { config: string; output?: string; tsconfig?: string; html?: string; ci?: boolean }) => {
+  .option('--update-baseline', 'Guardar las violaciones actuales en autopsia-baseline.json como toleradas')
+  .option('--no-baseline', 'Ignorar el baseline existente en este scan')
+  .action((scanPath: string, opts: { config: string; output?: string; tsconfig?: string; html?: string; ci?: boolean; updateBaseline?: boolean; baseline: boolean }) => {
     const root = path.resolve(scanPath);
     if (!fs.existsSync(root)) {
       console.error(chalk.red(`✖ La ruta no existe: ${root}`));
@@ -57,12 +60,22 @@ program
     console.log(chalk.gray(`\n  Escaneando ${root} ...`));
     const graph = buildGraph(root, config, opts.tsconfig);
 
-    const violations = [
+    const allViolations = [
       ...checkDependencyDirection(graph, config),
       ...checkDirectDataAccess(graph, config),
       ...checkForbiddenExternal(graph, config),
       ...checkCircularDeps(graph),
     ];
+
+    // Baseline: las violaciones ya registradas se toleran; solo las nuevas cuentan
+    let violations = allViolations;
+    let tolerated: Violation[] | undefined;
+    const baseline = opts.baseline === false ? null : loadBaseline(root);
+    if (baseline) {
+      const split = applyBaseline(allViolations, baseline);
+      violations = split.fresh;
+      tolerated = split.tolerated;
+    }
 
     const filesByLayer: Record<string, number> = {};
     for (const layer of config.layers) filesByLayer[layer.name] = 0;
@@ -76,12 +89,22 @@ program
       totalFiles: graph.length,
       filesByLayer,
       violations,
+      tolerated,
       graph,
     };
 
-    const result: ScanResult = { ...partial, healthByLayer: computeHealth(partial) };
+    // La salud refleja TODAS las violaciones (también las toleradas):
+    // el baseline perdona el --ci, no maquilla la arquitectura.
+    const result: ScanResult = {
+      ...partial,
+      healthByLayer: computeHealth({ ...partial, violations: allViolations }),
+    };
 
     printReport(result);
+
+    if (opts.updateBaseline) {
+      printBaselineSaved(saveBaseline(root, allViolations), allViolations.length);
+    }
 
     if (opts.output) writeJson(result, opts.output);
 
