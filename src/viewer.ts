@@ -1,4 +1,5 @@
 import chalk from 'chalk';
+import { spawn } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import { ScanResult } from './types';
@@ -467,4 +468,21 @@ export function writeHtml(result: ScanResult, outPath: string): void {
   fs.writeFileSync(resolved, generateHtml(result), 'utf-8');
   console.log(chalk.gray(`  Visor HTML guardado en ${outPath}`));
   console.log('');
+}
+
+/** Abre el archivo con el comando del SO (open / xdg-open / start), sin dependencias. */
+export function openInBrowser(file: string): void {
+  const resolved = path.resolve(file);
+  const [cmd, args] =
+    process.platform === 'darwin'
+      ? ['open', [resolved]]
+      : process.platform === 'win32'
+        ? ['cmd', ['/c', 'start', '', resolved]]
+        : ['xdg-open', [resolved]];
+
+  const child = spawn(cmd, args, { detached: true, stdio: 'ignore' });
+  child.on('error', () => {
+    console.log(chalk.yellow(`  No se pudo abrir automáticamente. Ábrelo manualmente: ${resolved}`));
+  });
+  child.unref();
 }

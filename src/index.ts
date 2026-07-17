@@ -8,7 +8,7 @@ import { applyBaseline, loadBaseline, printBaselineSaved, saveBaseline } from '.
 import { buildGraph } from './scanner';
 import { runRules } from './rules/run';
 import { computeHealth, printReport, writeJson } from './reporter';
-import { writeHtml } from './viewer';
+import { openInBrowser, writeHtml } from './viewer';
 import { runInit } from './init';
 
 const program = new Command();
@@ -24,11 +24,12 @@ program
   .option('-c, --config <file>', 'Ruta al autopsia.config.json', 'autopsia.config.json')
   .option('-o, --output <file>', 'Guardar reporte JSON en esta ruta')
   .option('--tsconfig <file>', 'Ruta al tsconfig.json del proyecto analizado (default: tsconfig.json en la raíz escaneada)')
-  .option('--html <file>', 'Generar visor HTML interactivo del grafo en esta ruta')
+  .option('--html [file]', 'Generar visor HTML interactivo del grafo (default: autopsia-report.html)')
+  .option('--open', 'Abrir el visor HTML en el navegador al terminar (implica --html)')
   .option('--ci', 'Modo CI: exit code 1 si hay violaciones de severidad error')
   .option('--update-baseline', 'Guardar las violaciones actuales en autopsia-baseline.json como toleradas')
   .option('--no-baseline', 'Ignorar el baseline existente en este scan')
-  .action((scanPath: string, opts: { config: string; output?: string; tsconfig?: string; html?: string; ci?: boolean; updateBaseline?: boolean; baseline: boolean }) => {
+  .action((scanPath: string, opts: { config: string; output?: string; tsconfig?: string; html?: string | boolean; open?: boolean; ci?: boolean; updateBaseline?: boolean; baseline: boolean }) => {
     const root = path.resolve(scanPath);
     if (!fs.existsSync(root)) {
       console.error(chalk.red(`✖ La ruta no existe: ${root}`));
@@ -105,7 +106,16 @@ program
 
     if (opts.output) writeJson(result, opts.output);
 
-    if (opts.html) writeHtml(result, opts.html);
+    // --html sin valor (o --open solo) usa el nombre por defecto
+    const htmlPath =
+      typeof opts.html === 'string' ? opts.html : opts.html || opts.open ? 'autopsia-report.html' : null;
+    if (htmlPath) {
+      writeHtml(result, htmlPath);
+      if (opts.open) openInBrowser(htmlPath);
+    } else {
+      console.log(chalk.gray('  Tip: agrega --html --open para ver el grafo interactivo'));
+      console.log('');
+    }
 
     if (opts.ci && violations.some((v) => v.severity === 'error')) {
       process.exit(1);
