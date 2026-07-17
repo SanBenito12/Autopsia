@@ -1,4 +1,5 @@
 import { AutopsiaConfig, FileNode, Violation } from '../types';
+import { isSuppressed } from '../ignores';
 
 function matchesModule(imported: string, configured: string): boolean {
   return imported === configured || imported.startsWith(configured + '/');
@@ -22,13 +23,17 @@ export function checkDirectDataAccess(
     for (const ext of node.externalImports) {
       const hit = config.dataAccessModules.find((m) => matchesModule(ext, m));
       if (hit) {
-        violations.push({
+        const violation: Violation = {
           rule: 'direct-data-access',
           severity: 'error',
           file: node.path,
           message: `Acceso directo a datos/red ("${ext}") en capa "${node.layer}"`,
           detail: 'Debe pasar por un repositorio o caso de uso',
-        });
+        };
+        if (isSuppressed(node, 'direct-data-access', { external: ext })) {
+          violation.suppressed = true;
+        }
+        violations.push(violation);
       }
     }
   }

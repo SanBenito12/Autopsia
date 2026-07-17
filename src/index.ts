@@ -60,12 +60,16 @@ program
     console.log(chalk.gray(`\n  Escaneando ${root} ...`));
     const graph = buildGraph(root, config, opts.tsconfig);
 
-    const allViolations = [
+    const rawViolations = [
       ...checkDependencyDirection(graph, config),
       ...checkDirectDataAccess(graph, config),
       ...checkForbiddenExternal(graph, config),
       ...checkCircularDeps(graph),
     ];
+
+    // Comentarios autopsia-ignore: las suprimidas solo se cuentan
+    const suppressedCount = rawViolations.filter((v) => v.suppressed).length;
+    const allViolations = rawViolations.filter((v) => !v.suppressed);
 
     // Baseline: las violaciones ya registradas se toleran; solo las nuevas cuentan
     let violations = allViolations;
@@ -90,6 +94,7 @@ program
       filesByLayer,
       violations,
       tolerated,
+      suppressedCount: suppressedCount > 0 ? suppressedCount : undefined,
       graph,
     };
 

@@ -1,8 +1,9 @@
 import { Project, SourceFile } from 'ts-morph';
 import * as fs from 'fs';
 import * as path from 'path';
-import { AutopsiaConfig, FileNode } from './types';
+import { AutopsiaConfig, FileNode, FileSuppressions } from './types';
 import { classifyFile } from './classifier';
+import { parseIgnoreDirectives } from './ignores';
 
 const DEFAULT_IGNORE = ['node_modules', 'dist', 'build', '.git', 'coverage', '__tests__', '__mocks__'];
 
@@ -18,23 +19,42 @@ function isIgnored(relPath: string, ignore: string[]): boolean {
 function resolveImport(sourceFile: SourceFile, root: string): {
   internal: { resolved: string; typeOnly: boolean }[];
   external: string[];
+  suppressions?: FileSuppressions;
 } {
   const internal: { resolved: string; typeOnly: boolean }[] = [];
   const external: string[] = [];
 
+  // Comentarios autopsia-ignore-next-line / autopsia-ignore-file
+  const ignores = parseIgnoreDirectives(sourceFile.getFullText());
+  const suppressions: FileSuppressions = { internal: {}, external: {} };
+  let hasSuppressions = false;
+  const rulesAt = (line: number): string[] => [
+    ...ignores.fileRules,
+    ...(ignores.lineRules.get(line) ?? []),
+  ];
+  const record = (target: Record<string, string[]>, key: string, rules: string[]): void => {
+    if (rules.length === 0) return;
+    target[key] = [...new Set([...(target[key] ?? []), ...rules])];
+    hasSuppressions = true;
+  };
+
   for (const decl of sourceFile.getImportDeclarations()) {
     const spec = decl.getModuleSpecifierValue();
     const typeOnly = decl.isTypeOnly();
+    const suppressedRules = rulesAt(decl.getStartLineNumber());
 
     const resolvedSource = decl.getModuleSpecifierSourceFile();
     if (resolvedSource) {
       const abs = resolvedSource.getFilePath();
       if (!abs.includes('node_modules')) {
-        internal.push({ resolved: path.relative(root, abs), typeOnly });
+        const resolved = path.relative(root, abs);
+        internal.push({ resolved, typeOnly });
+        record(suppressions.internal, resolved, suppressedRules);
         continue;
       }
       // Resuelto dentro de node_modules → externo
       external.push(spec);
+      record(suppressions.external, spec, suppressedRules);
       continue;
     }
 
@@ -44,9 +64,10 @@ function resolveImport(sourceFile: SourceFile, root: string): {
       continue;
     }
     external.push(spec);
+    record(suppressions.external, spec, suppressedRules);
   }
 
-  return { internal, external };
+  return hasSuppressions ? { internal, external, suppressions } : { internal, external };
 }
 
 export function buildGraph(root: string, config: AutopsiaConfig, tsconfigPath?: string): FileNode[] {
@@ -87,15 +108,17 @@ export function buildGraph(root: string, config: AutopsiaConfig, tsconfigPath?: 
     const rel = path.relative(root, sf.getFilePath());
     if (isIgnored(rel, ignore)) continue;
 
-    const { internal, external } = resolveImport(sf, root);
+    const { internal, external, suppressions } = resolveImport(sf, root);
 
-    nodes.push({
+    const node: FileNode = {
       path: rel,
       layer: classifyFile(rel, config),
       internalImports: internal.filter((i) => !i.typeOnly).map((i) => i.resolved),
       typeOnlyImports: internal.filter((i) => i.typeOnly).map((i) => i.resolved),
       externalImports: external,
-    });
+    };
+    if (suppressions) node.suppressions = suppressions;
+    nodes.push(node);
   }
 
   return nodes.sort((a, b) => a.path.localeCompare(b.path));

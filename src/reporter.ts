@@ -45,10 +45,16 @@ export function printReport(result: ScanResult): void {
   console.log('');
 
   const tolerated = result.tolerated ?? [];
+  const suppressedNote = (): void => {
+    if (result.suppressedCount) {
+      console.log(chalk.gray(`  ${result.suppressedCount} suprimida(s) con comentarios autopsia-ignore`));
+    }
+  };
 
   // Violaciones agrupadas por regla
   if (result.violations.length === 0 && tolerated.length === 0) {
     console.log(chalk.green.bold('  ✔ Sin violaciones. Arquitectura sana.'));
+    suppressedNote();
     console.log('');
     return;
   }
@@ -104,6 +110,7 @@ export function printReport(result: ScanResult): void {
       chalk.bold(`  Total: ${chalk.red(result.violations.length + ' violaciones')} en ${countByFile.size} archivos`)
     );
   }
+  suppressedNote();
   console.log('');
 }
 

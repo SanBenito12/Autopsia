@@ -1,4 +1,5 @@
 import { FileNode, Violation } from '../types';
+import { isSuppressed } from '../ignores';
 
 /**
  * Regla 4 — Dependencias circulares.
@@ -46,11 +47,27 @@ export function checkCircularDeps(nodes: FileNode[]): Violation[] {
     if ((color.get(node) ?? WHITE) === WHITE) dfs(node);
   }
 
-  return cycles.map((cycle) => ({
-    rule: 'circular-deps',
-    severity: 'error' as const,
-    file: cycle[0],
-    message: `Dependencia circular detectada (${cycle.length - 1} archivos)`,
-    detail: cycle.join(' → '),
-  }));
+  const nodeByPath = new Map(nodes.map((n) => [n.path, n]));
+
+  // Un ciclo queda suprimido si cualquiera de sus aristas (import) tiene
+  // un comentario autopsia-ignore para esta regla.
+  const cycleSuppressed = (cycle: string[]): boolean => {
+    for (let i = 0; i < cycle.length - 1; i++) {
+      const from = nodeByPath.get(cycle[i]);
+      if (from && isSuppressed(from, 'circular-deps', { internal: cycle[i + 1] })) return true;
+    }
+    return false;
+  };
+
+  return cycles.map((cycle) => {
+    const violation: Violation = {
+      rule: 'circular-deps',
+      severity: 'error',
+      file: cycle[0],
+      message: `Dependencia circular detectada (${cycle.length - 1} archivos)`,
+      detail: cycle.join(' → '),
+    };
+    if (cycleSuppressed(cycle)) violation.suppressed = true;
+    return violation;
+  });
 }

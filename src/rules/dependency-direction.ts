@@ -1,4 +1,5 @@
 import { AutopsiaConfig, FileNode, Violation } from '../types';
+import { isSuppressed } from '../ignores';
 
 /**
  * Regla 1 — Dirección de dependencias.
@@ -25,13 +26,17 @@ export function checkDependencyDirection(
       if (!targetLayer || targetLayer === node.layer) continue;
 
       if (!allowed.includes(targetLayer)) {
-        violations.push({
+        const violation: Violation = {
           rule: 'dependency-direction',
           severity: 'error',
           file: node.path,
           message: `Capa "${node.layer}" no puede depender de "${targetLayer}"`,
           detail: `importa ${imp}`,
-        });
+        };
+        if (isSuppressed(node, 'dependency-direction', { internal: imp })) {
+          violation.suppressed = true;
+        }
+        violations.push(violation);
       }
     }
   }

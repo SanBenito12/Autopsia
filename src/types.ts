@@ -25,6 +25,16 @@ export interface AutopsiaConfig {
   ignore?: string[];
 }
 
+/**
+ * Reglas suprimidas por comentarios `autopsia-ignore-*`, por import.
+ * La clave es la ruta resuelta (internos) o el especificador (externos);
+ * el valor es la lista de reglas suprimidas, donde "*" significa todas.
+ */
+export interface FileSuppressions {
+  internal: Record<string, string[]>;
+  external: Record<string, string[]>;
+}
+
 export interface FileNode {
   /** Ruta relativa al root escaneado */
   path: string;
@@ -35,6 +45,8 @@ export interface FileNode {
   externalImports: string[];
   /** Solo imports de tipos (import type ...) — se excluyen de reglas de dependencia */
   typeOnlyImports: string[];
+  /** Solo presente si el archivo tiene comentarios autopsia-ignore */
+  suppressions?: FileSuppressions;
 }
 
 export type Severity = 'error' | 'warning';
@@ -46,6 +58,8 @@ export interface Violation {
   line?: number;
   message: string;
   detail?: string;
+  /** true si un comentario autopsia-ignore la suprime (se cuenta, no se reporta) */
+  suppressed?: boolean;
 }
 
 export interface ScanResult {
@@ -57,6 +71,8 @@ export interface ScanResult {
   violations: Violation[];
   /** Violaciones ya registradas en autopsia-baseline.json — no fallan --ci */
   tolerated?: Violation[];
+  /** Violaciones suprimidas con comentarios autopsia-ignore (solo conteo) */
+  suppressedCount?: number;
   healthByLayer: Record<string, number>;
   graph: FileNode[];
 }
