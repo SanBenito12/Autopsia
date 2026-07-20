@@ -4,6 +4,19 @@ Todos los cambios notables de este proyecto se documentan en este archivo.
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el versionado sigue [SemVer](https://semver.org/lang/es/).
 
+## [0.2.1] - 2026-07-17
+
+Patch release nacido de probar la herramienta en un proyecto real ajeno. Sin breaking changes: solo defaults de `init`/CLI y documentación; el comportamiento de las reglas de análisis no cambia.
+
+### Fixed
+
+- `scan` ahora usa el directorio actual por default: `npx autopsia-rn scan` equivale a `scan .` (mismo criterio que `init`).
+- `autopsia init` genera `infrastructure` con `allowedDependencies: ["domain"]` en vez de `[]`. Las dependencias apuntan hacia adentro: un `RepositoryImpl` en infrastructure importa interfaces y errores del domain, y el default anterior marcaba cada implementación de un contrato como violación (falsos positivos masivos). Los configs ya generados no se tocan — ajusta el campo a mano si te afecta.
+
+### Added
+
+- `docs/rules.md`: sección "Casos frecuentes: logging y utilidades transversales" en `dependency-direction` — las tres salidas válidas cuando presentation necesita el logger de infrastructure (interfaz en domain + inyección, hook `useLogger`, o `autopsia-ignore` documentado).
+
 ## [0.2.0] - 2026-07-17
 
 Versión enfocada en adopción: que un proyecto legacy pueda instalar Autopsia en 2 minutos sin que le griten 25 errores que no puede arreglar hoy.
@@ -37,5 +50,6 @@ Versión inicial, publicada en npm como [`autopsia-rn`](https://www.npmjs.com/pa
 - Modo CI (`--ci`): exit code 1 si hay violaciones de severidad error.
 - Suite de tests (Vitest) y CI en GitHub Actions.
 
+[0.2.1]: https://github.com/SanBenito12/Autopsia/releases/tag/v0.2.1
 [0.2.0]: https://github.com/SanBenito12/Autopsia/releases/tag/v0.2.0
 [0.1.0]: https://github.com/SanBenito12/Autopsia/releases/tag/v0.1.0

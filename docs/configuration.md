@@ -26,7 +26,7 @@ Un config completo de referencia:
     {
       "name": "infrastructure",
       "patterns": ["src/infrastructure/*"],
-      "allowedDependencies": []
+      "allowedDependencies": ["domain"]
     }
   ],
   "dataAccessModules": ["axios", "@supabase/supabase-js", "@react-native-async-storage/async-storage"],
@@ -53,6 +53,17 @@ La lista de capas de tu arquitectura. Cada capa:
 | `forbiddenExternal` | Paquetes npm prohibidos en esta capa. Matchea por prefijo de paquete: `"@supabase"` bloquea `@supabase/supabase-js`. |
 
 Un archivo se clasifica con la **primera** capa cuyos patterns matcheen — si un archivo podría caer en dos, ordena la más específica primero. Los archivos que no matchean ninguna capa no se evalúan (el reporte dice cuántos quedaron sin capa).
+
+### ¿Por qué esos `allowedDependencies` por defecto?
+
+En Clean Architecture las dependencias apuntan **hacia adentro**: todas las capas pueden conocer al `domain`, y el `domain` no conoce a nadie. Por eso el default de `init` es:
+
+- `presentation → domain` — la UI consume casos de uso.
+- `data → domain, infrastructure` — los repositorios implementan contratos del domain apoyándose en clientes de infrastructure.
+- `infrastructure → domain` — sí, también: un `UserRepositoryImpl` en infrastructure necesita importar la interfaz `UserRepository` y los `DomainErrors` que va a lanzar. Prohibirlo (versiones ≤ 0.2.0 generaban `[]`) marcaba como violación cada implementación de un contrato — puros falsos positivos.
+- `domain → nada` — es el centro; si necesita algo de afuera, define una interfaz y que afuera la implementen.
+
+Lo prohibido es la flecha inversa (`domain → data`, `domain → infrastructure`): el negocio no debe saber cómo se habla con la red o el storage.
 
 ### Estructuras no estándar
 

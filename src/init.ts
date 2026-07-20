@@ -53,9 +53,25 @@ export function detectLayers(root: string): DetectedLayer[] {
   return detected;
 }
 
+/**
+ * Regla de dirección por defecto: las dependencias apuntan HACIA ADENTRO
+ * (hacia domain), nunca al revés.
+ * - presentation → domain: la UI consume casos de uso
+ * - data → domain + infrastructure: los repositorios implementan contratos
+ *   del domain y se apoyan en clientes de infrastructure
+ * - infrastructure → domain: un RepositoryImpl/adapter importa interfaces
+ *   y errores del domain (prohibírselo produce falsos positivos masivos)
+ * - domain → nada: es el centro, TypeScript puro
+ */
 function allowedFor(layerName: string, detectedNames: Set<string>): string[] {
   const wanted =
-    layerName === 'presentation' ? ['domain'] : layerName === 'data' ? ['domain', 'infrastructure'] : [];
+    layerName === 'presentation'
+      ? ['domain']
+      : layerName === 'data'
+        ? ['domain', 'infrastructure']
+        : layerName === 'infrastructure'
+          ? ['domain']
+          : [];
   return wanted.filter((n) => detectedNames.has(n));
 }
 

@@ -53,6 +53,70 @@ export function HomeScreen({ getEvents }: { getEvents: GetEventsUseCase }) {
 import { EventRepository } from '../../data/repositories/EventRepository';
 ```
 
+### Casos frecuentes: logging y utilidades transversales
+
+Tarde o temprano una pantalla necesita el logger (o analytics, o feature flags) que vive en `infrastructure`, y esta regla lo marca. Es la duda más común al adoptar la herramienta — y tiene tres salidas válidas:
+
+**Malo** — cada pantalla importa la implementación directamente:
+
+```tsx
+// src/presentation/screens/CheckoutScreen.tsx
+import { SentryLogger } from '../../infrastructure/logging/SentryLogger';   // ✖ presentation → infrastructure
+
+export function CheckoutScreen() {
+  SentryLogger.error('pago rechazado');
+}
+```
+
+**Opción A — interfaz en el dominio + inyección.** El contrato `Logger` vive en `domain` (o `domain/shared`); `infrastructure` lo implementa y el árbol de composición lo inyecta. Es la solución canónica: ninguna capa exterior conoce a otra capa exterior.
+
+```ts
+// src/domain/shared/Logger.ts — TypeScript puro ✔
+export interface Logger {
+  error(message: string): void;
+}
+
+// src/infrastructure/logging/SentryLogger.ts
+import { Logger } from '../../domain/shared/Logger';   // infrastructure → domain ✔
+export class SentryLogger implements Logger { /* ... */ }
+```
+
+```tsx
+// src/presentation/screens/CheckoutScreen.tsx
+import { Logger } from '../../domain/shared/Logger';   // presentation → domain ✔
+
+export function CheckoutScreen({ logger }: { logger: Logger }) {
+  logger.error('pago rechazado');
+}
+```
+
+**Opción B — hook `useLogger` en presentation.** Un solo hook envuelve la implementación (recibida vía Context desde la raíz de la app) y todas las pantallas lo usan. El acoplamiento queda contenido en un archivo en vez de regado por 40:
+
+```tsx
+// src/presentation/hooks/useLogger.ts
+import { createContext, useContext } from 'react';
+import { Logger } from '../../domain/shared/Logger';   // ✔ solo el contrato
+
+export const LoggerContext = createContext<Logger | null>(null);
+export const useLogger = (): Logger => useContext(LoggerContext)!;
+
+// App.tsx (raíz de composición) provee la impl de infrastructure UNA vez
+```
+
+```tsx
+// cualquier pantalla
+const logger = useLogger();   // ✔ sin saber qué logger es
+```
+
+**Opción C — la excepción documentada.** Si el proyecto es chico y montar inyección para un logger te parece sobreingeniería hoy, un `autopsia-ignore` con razón es una decisión legítima y visible en el código:
+
+```ts
+// autopsia-ignore-next-line dependency-direction -- logger global consciente, evaluar DI si crece
+import { SentryLogger } from '../../infrastructure/logging/SentryLogger';
+```
+
+La trampa a evitar es la cuarta opción silenciosa: apagar la regla entera porque el logger la dispara. Usa la excepción puntual, no `"off"`.
+
 ---
 
 ## direct-data-access
