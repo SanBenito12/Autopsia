@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { AutopsiaConfig, LayerConfig, RuleLevel } from './types';
 import { ALL_RULES } from './rules/run';
+import { buildGraph } from './scanner';
 
 /**
  * `autopsia init` — genera un autopsia.config.json detectando la estructura
@@ -114,6 +115,22 @@ export interface InitResult {
   detected: DetectedLayer[];
 }
 
+export interface InitCoverage {
+  totalFiles: number;
+  classifiedFiles: number;
+  percent: number;
+}
+
+/** Mide qué tanto del proyecto cubre el config recién generado. */
+export function measureConfigCoverage(root: string, config: AutopsiaConfig): InitCoverage {
+  const graph = buildGraph(root, config);
+  const classifiedFiles = graph.filter((node) => node.layer !== null).length;
+  const percent = graph.length === 0
+    ? 100
+    : Math.round((classifiedFiles / graph.length) * 1000) / 10;
+  return { totalFiles: graph.length, classifiedFiles, percent };
+}
+
 /**
  * Genera <root>/autopsia.config.json. Nunca sobrescribe un config existente
  * salvo con force=true.
@@ -144,6 +161,10 @@ export function runInit(root: string, force = false): number {
     return 1;
   }
 
+  const generatedConfig = JSON.parse(fs.readFileSync(result.configPath, 'utf-8')) as AutopsiaConfig;
+  const coverage = measureConfigCoverage(root, generatedConfig);
+  const lowCoverage = coverage.totalFiles > 0 && coverage.percent < 80;
+
   if (result.status === 'created-example') {
     console.log(chalk.yellow('\n  ⚠ No se detectaron capas típicas bajo src/'));
     console.log(chalk.gray('    Se generó un config de EJEMPLO. Ajusta:'));
@@ -151,9 +172,24 @@ export function runInit(root: string, force = false): number {
     console.log(chalk.gray('    · "allowedDependencies" según tu dirección de dependencias'));
     console.log(chalk.gray('    · "dataAccessModules" a los clientes de red/datos que uses'));
   } else {
-    console.log(chalk.green('\n  ✔ Capas detectadas:'));
+    console.log(
+      lowCoverage
+        ? chalk.yellow('\n  ⚠ Detección parcial de capas:')
+        : chalk.green('\n  ✔ Capas detectadas:')
+    );
     for (const layer of result.detected) {
       console.log(`    ${layer.name.padEnd(16)} ${chalk.gray('← src/' + layer.folders.join(', src/'))}`);
+    }
+  }
+
+  if (coverage.totalFiles > 0) {
+    const coverageText =
+      `${coverage.classifiedFiles}/${coverage.totalFiles} archivos (${coverage.percent}%)`;
+    if (lowCoverage) {
+      console.log(chalk.yellow(`\n  ⚠ El config generado solo cubre ${coverageText}.`));
+      console.log(chalk.gray('    Ajusta los patterns antes de confiar en el resultado del scan.'));
+    } else {
+      console.log(chalk.green(`\n  ✔ Cobertura inicial del config: ${coverageText}`));
     }
   }
 

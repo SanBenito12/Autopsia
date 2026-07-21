@@ -53,6 +53,8 @@ Los configs generados por `autopsia init` usan `"strict": true`. Además de eval
 
 Con `scan --ci`, cualquiera de estas condiciones produce exit code 1. Sin modo estricto se siguen mostrando los problemas de cobertura, pero no hacen fallar CI, preservando compatibilidad con proyectos existentes.
 
+`autopsia init` mide la cobertura inicial del config que genera. Si clasifica menos del 80% de los archivos, avisa que la detección fue parcial y pide ajustar los `patterns` antes de confiar en el scan. Esto es frecuente en proyectos organizados por features (`src/features/*`) o con composition root (`src/app`, `src/di`).
+
 ## `layers`
 
 La lista de capas de tu arquitectura. Cada capa:
@@ -106,7 +108,7 @@ En qué capas esos módulos son violación. Típicamente `["presentation"]`; agr
 
 ## `ignore`
 
-Carpetas a excluir del análisis (además de las que se ignoran siempre: `node_modules`, `dist`, `build`, `.git`, `coverage`, `__tests__`, `__mocks__`):
+Carpetas a excluir del análisis (además de las que se ignoran siempre: `node_modules`, `dist`, `build`, `.git`, `coverage`, `__tests__`, `__mocks__` y archivos `*.test.*` / `*.spec.*`):
 
 ```json
 "ignore": ["src/legacy", "e2e"]

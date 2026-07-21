@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.1] - 2026-07-21
+
+Patch de claridad basado en scans reales de proyectos layer-first y feature-first.
+
+### Changed
+
+- El reporte muestra porcentaje de cobertura arquitectónica y diferencia entre `ANÁLISIS COMPLETO`, `ANÁLISIS INCOMPLETO` y `CONFIGURACIÓN INSUFICIENTE`; solo declara la arquitectura verificada cuando además no hay violaciones.
+- Los problemas de cobertura se agrupan por archivos sin capa, imports sin resolver, capas ambiguas y errores de configuración.
+- Las capas con cero archivos muestran `N/A` en terminal y HTML, en vez de un engañoso `100%`.
+- El visor HTML muestra cobertura y ya no declara sana una arquitectura con análisis incompleto.
+- `autopsia init` mide la cobertura del config generado y advierte cuando clasifica menos del 80% del proyecto.
+- Los tests colocados junto al código (`*.test.*`, `*.spec.*`) se ignoran por defecto, igual que `__tests__` y `__mocks__`.
+
 ## [0.3.0] - 2026-07-21
 
 Versión enfocada en confianza: Autopsia ahora distingue entre una arquitectura verificada y un análisis que dejó archivos o dependencias sin comprobar.
@@ -63,6 +76,7 @@ Versión inicial, publicada en npm como [`autopsia-rn`](https://www.npmjs.com/pa
 - Modo CI (`--ci`): exit code 1 si hay violaciones de severidad error.
 - Suite de tests (Vitest) y CI en GitHub Actions.
 
+[0.3.1]: https://github.com/SanBenito12/Autopsia/releases/tag/v0.3.1
 [0.3.0]: https://github.com/SanBenito12/Autopsia/releases/tag/v0.3.0
 [0.2.1]: https://github.com/SanBenito12/Autopsia/releases/tag/v0.2.1
 [0.2.0]: https://github.com/SanBenito12/Autopsia/releases/tag/v0.2.0

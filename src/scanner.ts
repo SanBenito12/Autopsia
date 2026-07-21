@@ -5,7 +5,10 @@ import { AutopsiaConfig, Dependency, DependencyKind, FileNode, FileSuppressions 
 import { classifyFile } from './classifier';
 import { parseIgnoreDirectives } from './ignores';
 
-const DEFAULT_IGNORE = ['node_modules', 'dist', 'build', '.git', 'coverage', '__tests__', '__mocks__'];
+const DEFAULT_IGNORE = [
+  'node_modules', 'dist', 'build', '.git', 'coverage', '__tests__', '__mocks__',
+  '*.test.ts', '*.test.tsx', '*.spec.ts', '*.spec.tsx',
+];
 const ASSET_EXTENSIONS = new Set([
   '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.avif',
   '.ttf', '.otf', '.mp3', '.wav', '.mp4', '.mov', '.json', '.css', '.scss',

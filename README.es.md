@@ -77,6 +77,8 @@ Dependencias internas        1284 resueltas · 0 sin resolver
 
 Esto certifica el **cumplimiento de todas las reglas arquitectónicas configuradas**; ESLint y TypeScript siguen ocupándose de sintaxis, tipos y estilo.
 
+La cobertura se muestra como porcentaje. Autopsia separa archivos sin capa, imports sin resolver y patrones ambiguos; una configuración que cubre menos del 50% se identifica como `CONFIGURACIÓN INSUFICIENTE`. Las capas vacías muestran `N/A`, nunca un falso `100%`.
+
 ## Grafo interactivo
 
 `--html --open` genera un visor autocontenido: grafo force-directed de dependencias, un color por capa, aristas rojas para los imports que violan reglas.

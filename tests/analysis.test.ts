@@ -85,6 +85,16 @@ describe('dependencias completas del scanner', () => {
       path.join('src', 'presentation', 'screen.ts'),
     ]);
   });
+
+  it('ignora tests colocados junto al código de producción', () => {
+    write('src/presentation/screen.ts', 'export const Screen = true;\n');
+    write('src/presentation/screen.test.ts', "import './missing';\n");
+    write('src/presentation/screen.spec.tsx', "import './missing';\n");
+    const graph = buildGraph(root, config);
+    expect(graph.map((node) => node.path)).toEqual([
+      path.join('src', 'presentation', 'screen.ts'),
+    ]);
+  });
 });
 
 describe('validación y cobertura estricta', () => {

@@ -142,6 +142,7 @@ export function generateHtml(result: ScanResult): string {
     margin-bottom: 10px;
   }
   aside .clean { color: var(--good); font-size: 13px; }
+  aside .incomplete { color: var(--warning); font-size: 13px; }
   .rule-group { margin-bottom: 16px; }
   .rule-group .rule-name {
     display: flex; align-items: center; gap: 8px;
@@ -222,27 +223,31 @@ for (const l of links) {
 const radiusOf = (n) => 5 + Math.min(6, Math.sqrt(degree.get(n.path) ?? 0) * 2);
 
 // ---- Header: meta + salud por capa ----
+const classifiedFiles = result.analysis?.classifiedFiles ?? result.totalFiles;
+const coveragePct = result.totalFiles === 0 ? 100 : Math.round(classifiedFiles / result.totalFiles * 1000) / 10;
 document.getElementById('meta').textContent =
-  result.root + ' · ' + result.totalFiles + ' archivos · ' + new Date(result.scannedAt).toLocaleString();
+  result.root + ' · ' + result.totalFiles + ' archivos · cobertura ' + coveragePct + '% · ' +
+  new Date(result.scannedAt).toLocaleString();
 
 const healthColor = (pct) => pct >= 90 ? 'var(--good)' : pct >= 70 ? 'var(--warning)' : 'var(--critical)';
 const healthEl = document.getElementById('health');
 for (const [layer, pct] of Object.entries(result.healthByLayer)) {
+  const fileCount = result.filesByLayer[layer] ?? 0;
   const item = document.createElement('div');
   item.className = 'item';
   const label = document.createElement('div');
   label.className = 'label';
   const name = document.createElement('span');
-  name.textContent = layer + ' (' + (result.filesByLayer[layer] ?? 0) + ')';
+  name.textContent = layer + ' (' + fileCount + ')';
   const val = document.createElement('span');
   val.className = 'pct';
-  val.textContent = pct + '%';
+  val.textContent = fileCount === 0 ? 'N/A' : pct + '%';
   label.append(name, val);
   const bar = document.createElement('div');
   bar.className = 'bar';
   const fill = document.createElement('span');
-  fill.style.width = pct + '%';
-  fill.style.background = healthColor(pct);
+  fill.style.width = fileCount === 0 ? '0%' : pct + '%';
+  fill.style.background = fileCount === 0 ? 'var(--muted)' : healthColor(pct);
   bar.append(fill);
   item.append(label, bar);
   healthEl.append(item);
@@ -405,8 +410,11 @@ const panel = document.getElementById('violations');
 document.getElementById('panel-title').textContent = 'Violaciones (' + result.violations.length + ')';
 if (result.violations.length === 0) {
   const ok = document.createElement('div');
-  ok.className = 'clean';
-  ok.textContent = '✔ Sin violaciones. Arquitectura sana.';
+  const complete = result.analysis?.complete !== false;
+  ok.className = complete ? 'clean' : 'incomplete';
+  ok.textContent = complete
+    ? '✔ Sin violaciones. Arquitectura verificada.'
+    : '⚠ Sin violaciones detectadas, pero el análisis está incompleto.';
   panel.append(ok);
 }
 const byRule = new Map();

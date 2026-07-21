@@ -77,6 +77,8 @@ Internal dependencies        1284 resolved · 0 unresolved
 
 This certifies **compliance with every configured architecture rule**. ESLint and TypeScript remain responsible for syntax, types, and style.
 
+Coverage is shown as a percentage. Autopsia separates unclassified files, unresolved imports, and ambiguous patterns; a configuration covering less than 50% is labeled `INSUFFICIENT CONFIGURATION`. Empty layers display `N/A`, never a misleading `100%`.
+
 ## Interactive graph
 
 `--html --open` generates a self-contained viewer: force-directed dependency graph, one color per layer, red edges for violating imports.

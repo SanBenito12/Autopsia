@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { buildConfig, detectLayers, initProject } from '../src/init';
+import { buildConfig, detectLayers, initProject, measureConfigCoverage } from '../src/init';
 import { AutopsiaConfig } from '../src/types';
 
 let tmpRoot: string;
@@ -93,6 +93,19 @@ describe('buildConfig', () => {
     const byName = Object.fromEntries(config.layers.map((l) => [l.name, l]));
     expect(byName['presentation'].patterns).toEqual(['src/views/*']);
     expect(byName['domain'].patterns).toEqual(['src/core/*']);
+  });
+
+  it('mide cuando el config generado cubre muy poco de un proyecto feature-first', () => {
+    mkdirs('src/infrastructure', 'src/features/auth');
+    fs.writeFileSync(path.join(tmpRoot, 'src/infrastructure/client.ts'), 'export {};\n');
+    fs.writeFileSync(path.join(tmpRoot, 'src/features/auth/Login.tsx'), 'export {};\n');
+    const config = buildConfig(detectLayers(tmpRoot));
+
+    expect(measureConfigCoverage(tmpRoot, config)).toEqual({
+      totalFiles: 2,
+      classifiedFiles: 1,
+      percent: 50,
+    });
   });
 });
 

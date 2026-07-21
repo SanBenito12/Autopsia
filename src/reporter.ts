@@ -1,6 +1,41 @@
 import chalk from 'chalk';
 import * as fs from 'fs';
-import { ScanResult, Violation } from './types';
+import { AnalysisIssue, AnalysisIssueKind, ScanResult, Violation } from './types';
+
+const ISSUE_LABELS: Record<AnalysisIssueKind, string> = {
+  'unclassified-file': 'Archivos sin capa',
+  'unresolved-import': 'Imports internos sin resolver',
+  'ambiguous-layer': 'Archivos con capa ambigua',
+  'invalid-config': 'Errores de configuración',
+};
+
+export function analysisCoveragePercent(result: ScanResult): number {
+  if (result.totalFiles === 0) return 100;
+  return Math.round(((result.analysis?.classifiedFiles ?? result.totalFiles) / result.totalFiles) * 1000) / 10;
+}
+
+function formatPercent(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+function printIssueGroups(issues: AnalysisIssue[]): void {
+  const order: AnalysisIssueKind[] = [
+    'unclassified-file',
+    'unresolved-import',
+    'ambiguous-layer',
+    'invalid-config',
+  ];
+  for (const kind of order) {
+    const group = issues.filter((issue) => issue.kind === kind);
+    if (group.length === 0) continue;
+    console.log(chalk.bold(`    ${ISSUE_LABELS[kind]} — ${group.length}`));
+    for (const issue of group.slice(0, 5)) {
+      const location = issue.file ? `${issue.file}${issue.line ? `:${issue.line}` : ''}` : '';
+      console.log(`      ${location ? chalk.cyan(location) + ' · ' : ''}${issue.message}`);
+    }
+    if (group.length > 5) console.log(chalk.gray(`      … y ${group.length - 5} más`));
+  }
+}
 
 export function computeHealth(result: Omit<ScanResult, 'healthByLayer'>): Record<string, number> {
   const filesWithViolations = new Set(result.violations.map((v) => v.file));
@@ -28,11 +63,15 @@ export function printReport(result: ScanResult): void {
   console.log(chalk.gray(`  ${result.root} · ${result.totalFiles} archivos analizados`));
   console.log('');
 
-  // Salud por capa
-  console.log(chalk.bold('  Salud por capa'));
+  // La salud solo describe archivos que sí pertenecen a una capa.
+  console.log(chalk.bold('  Salud de archivos evaluados'));
   for (const [layer, pct] of Object.entries(result.healthByLayer)) {
-    const bar = '█'.repeat(Math.round(pct / 5)).padEnd(20, '░');
     const count = result.filesByLayer[layer] ?? 0;
+    if (count === 0) {
+      console.log(`  ${layer.padEnd(16)} ${chalk.gray('──────────────────── N/A (0 archivos)')}`);
+      continue;
+    }
+    const bar = '█'.repeat(Math.round(pct / 5)).padEnd(20, '░');
     console.log(
       `  ${layer.padEnd(16)} ${healthColor(pct)(bar)} ${healthColor(pct)(pct + '%')} ${chalk.gray(`(${count} archivos)`)}`
     );
@@ -46,25 +85,23 @@ export function printReport(result: ScanResult): void {
 
   if (result.analysis) {
     const analysis = result.analysis;
+    const coveragePct = analysisCoveragePercent(result);
     console.log(chalk.bold('  Cobertura del análisis'));
     console.log(
-      `  Archivos clasificados       ${String(analysis.classifiedFiles).padStart(5)} / ${result.totalFiles}`
+      `  Cobertura arquitectónica    ${formatPercent(coveragePct).padStart(5)}% ` +
+      `(${analysis.classifiedFiles} / ${result.totalFiles} archivos)`
     );
     console.log(
       `  Dependencias internas       ${String(analysis.resolvedInternalDependencies).padStart(5)} resueltas · ` +
       `${analysis.unresolvedInternalDependencies} sin resolver`
     );
     if (analysis.complete) {
-      console.log(chalk.green('  ✔ Análisis completo: no quedaron fronteras sin comprobar'));
+      console.log(chalk.green.bold('  ✔ ANÁLISIS COMPLETO — no quedaron fronteras sin comprobar'));
     } else {
-      console.log(chalk.yellow.bold(`  ⚠ Análisis incompleto — ${analysis.issues.length} problema(s)`));
-      for (const issue of analysis.issues.slice(0, 10)) {
-        const location = issue.file ? `${issue.file}${issue.line ? `:${issue.line}` : ''}` : '';
-        console.log(`    ${location ? chalk.cyan(location) + ' · ' : ''}${issue.message}`);
-      }
-      if (analysis.issues.length > 10) {
-        console.log(chalk.gray(`    … y ${analysis.issues.length - 10} problema(s) más`));
-      }
+      const status = coveragePct < 50 ? 'CONFIGURACIÓN INSUFICIENTE' : 'ANÁLISIS INCOMPLETO';
+      const color = coveragePct < 50 ? chalk.red.bold : chalk.yellow.bold;
+      console.log(color(`  ⚠ ${status} — ${analysis.issues.length} problema(s)`));
+      printIssueGroups(analysis.issues);
     }
     console.log('');
   }
