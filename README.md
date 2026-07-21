@@ -57,6 +57,26 @@ npx autopsia-rn scan . --ci                # ✅ passes — will only fail on NE
 
 Commit `autopsia-baseline.json` and your legacy debt stops screaming at you while you pay it down. Details in the [getting started guide](docs/getting-started.md#adopting-autopsia-in-a-legacy-project).
 
+## Strict verification
+
+New configs include `"strict": true`. In strict mode Autopsia never calls an architecture healthy when something was left unchecked:
+
+- every TypeScript file must belong to exactly one layer;
+- every internal dependency must resolve;
+- layer patterns cannot be ambiguous;
+- every layer and rule referenced by the config must exist.
+
+The scanner follows `import`, re-exports (`export ... from`), `require()`, and dynamic `import()`, and reports exact source lines. In CI, incomplete analysis fails even when no violation was found:
+
+```text
+Analysis coverage
+Classified files              438 / 438
+Internal dependencies        1284 resolved · 0 unresolved
+✔ Complete analysis: no architectural boundary was left unchecked
+```
+
+This certifies **compliance with every configured architecture rule**. ESLint and TypeScript remain responsible for syntax, types, and style.
+
 ## Interactive graph
 
 `--html --open` generates a self-contained viewer: force-directed dependency graph, one color per layer, red edges for violating imports.

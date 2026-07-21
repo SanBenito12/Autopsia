@@ -31,6 +31,7 @@ Un config completo de referencia:
   ],
   "dataAccessModules": ["axios", "@supabase/supabase-js", "@react-native-async-storage/async-storage"],
   "noDirectDataAccessIn": ["presentation"],
+  "strict": true,
   "ignore": ["src/legacy"],
   "rules": {
     "dependency-direction": "error",
@@ -40,6 +41,17 @@ Un config completo de referencia:
   }
 }
 ```
+
+## `strict`
+
+Los configs generados por `autopsia init` usan `"strict": true`. Además de evaluar las reglas, exige cobertura completa:
+
+- cero archivos sin capa;
+- cero archivos que coincidan con más de una capa;
+- cero imports internos sin resolver;
+- cero referencias inválidas en el config.
+
+Con `scan --ci`, cualquiera de estas condiciones produce exit code 1. Sin modo estricto se siguen mostrando los problemas de cobertura, pero no hacen fallar CI, preservando compatibilidad con proyectos existentes.
 
 ## `layers`
 

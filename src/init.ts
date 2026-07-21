@@ -97,6 +97,7 @@ export function buildConfig(detected: DetectedLayer[]): AutopsiaConfig {
     dataAccessModules: [...DEFAULT_DATA_ACCESS],
     noDirectDataAccessIn: detectedNames.has('presentation') ? ['presentation'] : [],
     rules,
+    strict: true,
   };
 }
 

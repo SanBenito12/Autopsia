@@ -28,6 +28,28 @@ export interface AutopsiaConfig {
   ignore?: string[];
   /** Severidad por regla. Si se omite, todas corren como "error". */
   rules?: Record<string, RuleLevel>;
+  /**
+   * Exige cobertura arquitectónica completa: todos los archivos deben pertenecer
+   * a una sola capa y todos los imports internos deben poder resolverse.
+   */
+  strict?: boolean;
+}
+
+export type DependencyKind = 'import' | 'dynamic-import' | 'require' | 're-export';
+
+/** Evidencia de una dependencia encontrada en el AST. */
+export interface Dependency {
+  /** Texto escrito en el módulo, p. ej. "@/domain/User". */
+  specifier: string;
+  kind: DependencyKind;
+  line: number;
+  column: number;
+  typeOnly: boolean;
+  external: boolean;
+  /** Ruta relativa al proyecto para dependencias internas resueltas. */
+  resolvedPath?: string;
+  /** false significa que era un import interno, pero TypeScript no pudo resolverlo. */
+  resolved: boolean;
 }
 
 /**
@@ -50,8 +72,37 @@ export interface FileNode {
   externalImports: string[];
   /** Solo imports de tipos (import type ...) — se excluyen de reglas de dependencia */
   typeOnlyImports: string[];
+  /** Dependencias completas con evidencia y estado de resolución. */
+  dependencies?: Dependency[];
   /** Solo presente si el archivo tiene comentarios autopsia-ignore */
   suppressions?: FileSuppressions;
+}
+
+export type AnalysisIssueKind =
+  | 'invalid-config'
+  | 'ambiguous-layer'
+  | 'unclassified-file'
+  | 'unresolved-import';
+
+export interface AnalysisIssue {
+  kind: AnalysisIssueKind;
+  message: string;
+  file?: string;
+  line?: number;
+  detail?: string;
+}
+
+export interface AnalysisCoverage {
+  classifiedFiles: number;
+  unclassifiedFiles: number;
+  totalDependencies: number;
+  resolvedInternalDependencies: number;
+  unresolvedInternalDependencies: number;
+  configErrors: number;
+  ambiguousFiles: number;
+  /** true solo cuando no quedó ninguna parte arquitectónica sin comprobar. */
+  complete: boolean;
+  issues: AnalysisIssue[];
 }
 
 export type Severity = 'error' | 'warning';
@@ -80,4 +131,6 @@ export interface ScanResult {
   suppressedCount?: number;
   healthByLayer: Record<string, number>;
   graph: FileNode[];
+  /** Cobertura y problemas que pueden impedir certificar el resultado. */
+  analysis?: AnalysisCoverage;
 }

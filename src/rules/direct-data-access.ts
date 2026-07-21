@@ -23,10 +23,12 @@ export function checkDirectDataAccess(
     for (const ext of node.externalImports) {
       const hit = config.dataAccessModules.find((m) => matchesModule(ext, m));
       if (hit) {
+        const evidence = node.dependencies?.find((dependency) => dependency.specifier === ext);
         const violation: Violation = {
           rule: 'direct-data-access',
           severity: 'error',
           file: node.path,
+          line: evidence?.line,
           message: `Acceso directo a datos/red ("${ext}") en capa "${node.layer}"`,
           detail: 'Debe pasar por un repositorio o caso de uso',
         };

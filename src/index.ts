@@ -10,13 +10,14 @@ import { runRules } from './rules/run';
 import { computeHealth, printReport, writeJson } from './reporter';
 import { openInBrowser, writeHtml } from './viewer';
 import { runInit } from './init';
+import { computeAnalysisCoverage, validateConfig } from './analysis';
 
 const program = new Command();
 
 program
   .name('autopsia')
   .description('Auditor de Clean Architecture para proyectos React Native / TypeScript')
-  .version('0.2.1')
+  .version('0.3.0')
   .addHelpText(
     'after',
     `
@@ -71,7 +72,21 @@ Ejemplos:
       process.exit(2);
     }
 
-    const config: AutopsiaConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    let config: AutopsiaConfig;
+    try {
+      config = JSON.parse(fs.readFileSync(configPath, 'utf-8')) as AutopsiaConfig;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(chalk.red(`✖ No se pudo leer el config: ${message}`));
+      process.exit(2);
+    }
+    const configIssues = validateConfig(config);
+    if (configIssues.length > 0) {
+      console.error(chalk.red.bold('\n  ✖ Configuración inválida'));
+      for (const issue of configIssues) console.error(chalk.red(`  - ${issue.message}`));
+      console.error('');
+      process.exit(2);
+    }
 
     if (opts.tsconfig && !fs.existsSync(path.resolve(opts.tsconfig))) {
       console.error(chalk.red(`✖ No se encontró el tsconfig: ${path.resolve(opts.tsconfig)}`));
@@ -80,6 +95,7 @@ Ejemplos:
 
     console.log(chalk.gray(`\n  Escaneando ${root} ...`));
     const graph = buildGraph(root, config, opts.tsconfig);
+    const analysis = computeAnalysisCoverage(graph, config, configIssues);
 
     const rawViolations = runRules(graph, config);
 
@@ -112,6 +128,7 @@ Ejemplos:
       tolerated,
       suppressedCount: suppressedCount > 0 ? suppressedCount : undefined,
       graph,
+      analysis,
     };
 
     // La salud refleja TODAS las violaciones (también las toleradas):
@@ -140,7 +157,10 @@ Ejemplos:
       console.log('');
     }
 
-    if (opts.ci && violations.some((v) => v.severity === 'error')) {
+    if (
+      opts.ci &&
+      (violations.some((v) => v.severity === 'error') || (config.strict === true && !analysis.complete))
+    ) {
       process.exit(1);
     }
   });

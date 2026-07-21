@@ -73,6 +73,7 @@ describe('buildConfig', () => {
     expect(byName['infrastructure'].allowedDependencies).toEqual(['domain']);
     expect(config.noDirectDataAccessIn).toEqual(['presentation']);
     expect(config.dataAccessModules).toContain('axios');
+    expect(config.strict).toBe(true);
   });
 
   it('solo permite depender de capas realmente detectadas', () => {

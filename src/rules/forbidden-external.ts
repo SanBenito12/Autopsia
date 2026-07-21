@@ -29,10 +29,12 @@ export function checkForbiddenExternal(
     for (const ext of node.externalImports) {
       const hit = forbidden.find((f) => matchesModule(ext, f));
       if (hit) {
+        const evidence = node.dependencies?.find((dependency) => dependency.specifier === ext);
         const violation: Violation = {
           rule: 'forbidden-external',
           severity: 'error',
           file: node.path,
+          line: evidence?.line,
           message: `Capa "${node.layer}" importa módulo prohibido "${ext}"`,
           detail: `La capa debe mantenerse libre de "${hit}"`,
         };

@@ -44,6 +44,31 @@ export function printReport(result: ScanResult): void {
   }
   console.log('');
 
+  if (result.analysis) {
+    const analysis = result.analysis;
+    console.log(chalk.bold('  Cobertura del análisis'));
+    console.log(
+      `  Archivos clasificados       ${String(analysis.classifiedFiles).padStart(5)} / ${result.totalFiles}`
+    );
+    console.log(
+      `  Dependencias internas       ${String(analysis.resolvedInternalDependencies).padStart(5)} resueltas · ` +
+      `${analysis.unresolvedInternalDependencies} sin resolver`
+    );
+    if (analysis.complete) {
+      console.log(chalk.green('  ✔ Análisis completo: no quedaron fronteras sin comprobar'));
+    } else {
+      console.log(chalk.yellow.bold(`  ⚠ Análisis incompleto — ${analysis.issues.length} problema(s)`));
+      for (const issue of analysis.issues.slice(0, 10)) {
+        const location = issue.file ? `${issue.file}${issue.line ? `:${issue.line}` : ''}` : '';
+        console.log(`    ${location ? chalk.cyan(location) + ' · ' : ''}${issue.message}`);
+      }
+      if (analysis.issues.length > 10) {
+        console.log(chalk.gray(`    … y ${analysis.issues.length - 10} problema(s) más`));
+      }
+    }
+    console.log('');
+  }
+
   const tolerated = result.tolerated ?? [];
   const suppressedNote = (): void => {
     if (result.suppressedCount) {
@@ -53,7 +78,12 @@ export function printReport(result: ScanResult): void {
 
   // Violaciones agrupadas por regla
   if (result.violations.length === 0 && tolerated.length === 0) {
-    console.log(chalk.green.bold('  ✔ Sin violaciones. Arquitectura sana.'));
+    const verified = result.analysis?.complete !== false;
+    console.log(
+      verified
+        ? chalk.green.bold('  ✔ Sin violaciones. Arquitectura verificada.')
+        : chalk.yellow.bold('  ⚠ Sin violaciones detectadas, pero el análisis está incompleto.')
+    );
     suppressedNote();
     console.log('');
     return;
@@ -70,7 +100,7 @@ export function printReport(result: ScanResult): void {
     const header = isWarning ? chalk.bold.yellow(`  ⚠ ${rule}`) : chalk.bold.red(`  ✖ ${rule}`);
     console.log(header + chalk.gray(` — ${violations.length} violación(es)`));
     for (const v of violations) {
-      console.log(`    ${chalk.cyan(v.file)}`);
+      console.log(`    ${chalk.cyan(v.file + (v.line ? `:${v.line}` : ''))}`);
       console.log(`      ${v.message}`);
       if (v.detail) console.log(chalk.gray(`      ↳ ${v.detail}`));
     }

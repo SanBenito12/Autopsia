@@ -57,6 +57,26 @@ npx autopsia-rn scan . --ci                # ✅ pasa — solo fallará con viol
 
 Commitea `autopsia-baseline.json` y tu deuda legacy deja de gritarte mientras la pagas. Detalles en la [guía de inicio](docs/getting-started.md#adopting-autopsia-in-a-legacy-project).
 
+## Verificación estricta
+
+Los configs nuevos incluyen `"strict": true`. En este modo Autopsia no declara sana una arquitectura si quedó algo sin comprobar:
+
+- todos los archivos TypeScript deben pertenecer exactamente a una capa;
+- todos los imports internos deben resolverse;
+- los patterns de capas no pueden ser ambiguos;
+- las capas y reglas mencionadas en el config deben existir.
+
+El scanner reconoce `import`, reexports (`export ... from`), `require()` e `import()` dinámico, y muestra la línea exacta de cada violación. En CI, un análisis incompleto falla aunque no se haya encontrado una violación:
+
+```text
+Cobertura del análisis
+Archivos clasificados         438 / 438
+Dependencias internas        1284 resueltas · 0 sin resolver
+✔ Análisis completo: no quedaron fronteras sin comprobar
+```
+
+Esto certifica el **cumplimiento de todas las reglas arquitectónicas configuradas**; ESLint y TypeScript siguen ocupándose de sintaxis, tipos y estilo.
+
 ## Grafo interactivo
 
 `--html --open` genera un visor autocontenido: grafo force-directed de dependencias, un color por capa, aristas rojas para los imports que violan reglas.

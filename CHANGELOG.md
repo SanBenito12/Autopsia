@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.0] - 2026-07-21
+
+Versión enfocada en confianza: Autopsia ahora distingue entre una arquitectura verificada y un análisis que dejó archivos o dependencias sin comprobar.
+
+### Added
+
+- Add strict architecture verification with analysis coverage.
+- Detect re-exports, CommonJS `require()`, and dynamic `import()` dependencies.
+- Report exact source lines for import-based violations.
+- Validate unknown layers, duplicated layers, invalid rule levels, and unknown rules.
+- Treat unresolved internal imports and ambiguous/unclassified files as incomplete analysis.
+- Generate new configurations with `strict: true`.
+
 Todos los cambios notables de este proyecto se documentan en este archivo.
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el versionado sigue [SemVer](https://semver.org/lang/es/).
@@ -50,6 +63,7 @@ Versión inicial, publicada en npm como [`autopsia-rn`](https://www.npmjs.com/pa
 - Modo CI (`--ci`): exit code 1 si hay violaciones de severidad error.
 - Suite de tests (Vitest) y CI en GitHub Actions.
 
+[0.3.0]: https://github.com/SanBenito12/Autopsia/releases/tag/v0.3.0
 [0.2.1]: https://github.com/SanBenito12/Autopsia/releases/tag/v0.2.1
 [0.2.0]: https://github.com/SanBenito12/Autopsia/releases/tag/v0.2.0
 [0.1.0]: https://github.com/SanBenito12/Autopsia/releases/tag/v0.1.0

@@ -26,10 +26,14 @@ export function checkDependencyDirection(
       if (!targetLayer || targetLayer === node.layer) continue;
 
       if (!allowed.includes(targetLayer)) {
+        const evidence = node.dependencies?.find(
+          (dependency) => dependency.resolvedPath === imp && !dependency.typeOnly
+        );
         const violation: Violation = {
           rule: 'dependency-direction',
           severity: 'error',
           file: node.path,
+          line: evidence?.line,
           message: `Capa "${node.layer}" no puede depender de "${targetLayer}"`,
           detail: `importa ${imp}`,
         };

@@ -60,10 +60,15 @@ export function checkCircularDeps(nodes: FileNode[]): Violation[] {
   };
 
   return cycles.map((cycle) => {
+    const firstNode = nodeByPath.get(cycle[0]);
+    const evidence = firstNode?.dependencies?.find(
+      (dependency) => dependency.resolvedPath === cycle[1] && !dependency.typeOnly
+    );
     const violation: Violation = {
       rule: 'circular-deps',
       severity: 'error',
       file: cycle[0],
+      line: evidence?.line,
       message: `Dependencia circular detectada (${cycle.length - 1} archivos)`,
       detail: cycle.join(' → '),
     };

@@ -12,14 +12,13 @@ function patternToRegex(pattern: string): RegExp {
   return new RegExp(escaped, 'i');
 }
 
-export function classifyFile(relPath: string, config: AutopsiaConfig): string | null {
+export function matchingLayers(relPath: string, config: AutopsiaConfig): string[] {
   const normalized = relPath.replace(/\\/g, '/');
-  for (const layer of config.layers) {
-    for (const pattern of layer.patterns) {
-      if (patternToRegex(pattern).test(normalized)) {
-        return layer.name;
-      }
-    }
-  }
-  return null;
+  return config.layers
+    .filter((layer) => layer.patterns.some((pattern) => patternToRegex(pattern).test(normalized)))
+    .map((layer) => layer.name);
+}
+
+export function classifyFile(relPath: string, config: AutopsiaConfig): string | null {
+  return matchingLayers(relPath, config)[0] ?? null;
 }
