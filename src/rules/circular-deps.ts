@@ -1,5 +1,5 @@
 import { FileNode, Violation } from '../types';
-import { isSuppressed } from '../ignores';
+import { dependencySuppressed, isSuppressed } from '../ignores';
 
 /**
  * Regla 4 — Dependencias circulares.
@@ -54,7 +54,10 @@ export function checkCircularDeps(nodes: FileNode[]): Violation[] {
   const cycleSuppressed = (cycle: string[]): boolean => {
     for (let i = 0; i < cycle.length - 1; i++) {
       const from = nodeByPath.get(cycle[i]);
-      if (from && isSuppressed(from, 'circular-deps', { internal: cycle[i + 1] })) return true;
+      if (!from) continue;
+      const occurrences = from.dependencies?.filter((d) => d.resolvedPath === cycle[i + 1] && !d.typeOnly);
+      if (occurrences ? occurrences.length > 0 && occurrences.every((d) => dependencySuppressed(d, 'circular-deps'))
+        : isSuppressed(from, 'circular-deps', { internal: cycle[i + 1] })) return true;
     }
     return false;
   };

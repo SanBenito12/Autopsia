@@ -6,7 +6,7 @@ import { ScanResult } from './types';
 
 /**
  * Visor HTML interactivo del grafo de dependencias.
- * Genera un archivo autocontenido (d3 v7 vía CDN, datos embebidos) con:
+ * Genera un archivo autocontenido (d3 v7 y datos embebidos) con:
  * grafo force-directed coloreado por capa, aristas rojas para imports que
  * violan reglas, tooltip por archivo, panel de violaciones y salud por capa.
  */
@@ -35,6 +35,12 @@ function violationEdges(result: ScanResult): string[] {
 }
 
 export function generateHtml(result: ScanResult): string {
+  const bundled = path.join(__dirname, 'vendor', 'd3.min.js');
+  const d3Path = fs.existsSync(bundled) ? bundled : path.resolve(path.dirname(require.resolve('d3')), '../dist/d3.min.js');
+  const d3 = fs.readFileSync(d3Path, 'utf-8').replace(/<\/script/gi, '<\\/script');
+  const licensePath = fs.existsSync(bundled) ? path.join(__dirname, 'vendor', 'D3-LICENSE')
+    : path.resolve(path.dirname(d3Path), '../LICENSE');
+  const license = fs.readFileSync(licensePath, 'utf-8');
   const payload = JSON.stringify({ result, violationEdges: violationEdges(result) })
     // Evita cerrar el <script> si alguna ruta contiene "</script>"
     .replace(/</g, '\\u003c');
@@ -187,7 +193,10 @@ export function generateHtml(result: ScanResult): string {
 </main>
 <div id="tooltip"></div>
 <script id="autopsia-data" type="application/json">${payload}</script>
-<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script>/*
+${license}
+*/
+${d3}</script>
 <script>
 const { result, violationEdges } = JSON.parse(document.getElementById('autopsia-data').textContent);
 
@@ -224,7 +233,7 @@ const radiusOf = (n) => 5 + Math.min(6, Math.sqrt(degree.get(n.path) ?? 0) * 2);
 
 // ---- Header: meta + salud por capa ----
 const classifiedFiles = result.analysis?.classifiedFiles ?? result.totalFiles;
-const coveragePct = result.totalFiles === 0 ? 100 : Math.round(classifiedFiles / result.totalFiles * 1000) / 10;
+const coveragePct = result.totalFiles === 0 ? 0 : Math.round(classifiedFiles / result.totalFiles * 1000) / 10;
 document.getElementById('meta').textContent =
   result.root + ' · ' + result.totalFiles + ' archivos · cobertura ' + coveragePct + '% · ' +
   new Date(result.scannedAt).toLocaleString();

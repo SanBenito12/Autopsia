@@ -49,16 +49,17 @@ function pathAliasMatches(specifier: string, project: Project): boolean {
   });
 }
 
-function callSpecifier(call: CallExpression): { specifier: string; kind: DependencyKind } | null {
+function callSpecifier(call: CallExpression): { specifier: string; kind: DependencyKind; unanalyzable: boolean } | null {
   const expression = call.getExpression();
   const isDynamicImport = expression.getKind() === SyntaxKind.ImportKeyword;
   const isRequire = Node.isIdentifier(expression) && expression.getText() === 'require';
   if (!isDynamicImport && !isRequire) return null;
   const first = call.getArguments()[0];
-  if (!first || !Node.isStringLiteral(first)) return null;
+  const literal = first && (Node.isStringLiteral(first) || Node.isNoSubstitutionTemplateLiteral(first));
   return {
-    specifier: first.getLiteralValue(),
+    specifier: literal ? first.getLiteralValue() : first?.getText() ?? '<missing argument>',
     kind: isDynamicImport ? 'dynamic-import' : 'require',
+    unanalyzable: !literal,
   };
 }
 
@@ -93,9 +94,10 @@ function resolveDependencies(sourceFile: SourceFile, root: string): {
     typeOnly: boolean,
     positionNode: Node,
     resolvedSource?: SourceFile,
+    directiveLine = positionNode.getStartLineNumber(),
   ): void => {
-    const location = sourceFile.getLineAndColumnAtPos(positionNode.getStart());
-    const suppressedRules = rulesAt(positionNode.getStartLineNumber());
+    const suppressedRules = rulesAt(directiveLine);
+    const location = { ...sourceFile.getLineAndColumnAtPos(positionNode.getStart()), suppressedRules };
     if (resolvedSource) {
       const abs = resolvedSource.getFilePath();
       if (!abs.includes('node_modules')) {
@@ -105,8 +107,7 @@ function resolveDependencies(sourceFile: SourceFile, root: string): {
         dependencies.push({
           specifier: spec,
           kind,
-          line: location.line,
-          column: location.column,
+          ...location,
           typeOnly,
           external: false,
           resolvedPath: resolved,
@@ -119,8 +120,7 @@ function resolveDependencies(sourceFile: SourceFile, root: string): {
       dependencies.push({
         specifier: spec,
         kind,
-        line: location.line,
-        column: location.column,
+        ...location,
         typeOnly,
         external: true,
         resolved: true,
@@ -134,8 +134,7 @@ function resolveDependencies(sourceFile: SourceFile, root: string): {
       dependencies.push({
         specifier: spec,
         kind,
-        line: location.line,
-        column: location.column,
+        ...location,
         typeOnly,
         // Los assets no participan en fronteras arquitectónicas.
         external: true,
@@ -148,8 +147,7 @@ function resolveDependencies(sourceFile: SourceFile, root: string): {
       dependencies.push({
         specifier: spec,
         kind,
-        line: location.line,
-        column: location.column,
+        ...location,
         typeOnly,
         external: false,
         resolved: false,
@@ -161,8 +159,7 @@ function resolveDependencies(sourceFile: SourceFile, root: string): {
     dependencies.push({
       specifier: spec,
       kind,
-      line: location.line,
-      column: location.column,
+      ...location,
       typeOnly,
       external: true,
       // Un paquete no necesita estar instalado para aplicar reglas por nombre.
@@ -177,6 +174,7 @@ function resolveDependencies(sourceFile: SourceFile, root: string): {
       importIsTypeOnly(decl),
       decl.getModuleSpecifier(),
       decl.getModuleSpecifierSourceFile(),
+      decl.getStartLineNumber(),
     );
   }
 
@@ -193,6 +191,7 @@ function resolveDependencies(sourceFile: SourceFile, root: string): {
       typeOnly,
       moduleSpecifier,
       decl.getModuleSpecifierSourceFile(),
+      decl.getStartLineNumber(),
     );
   }
 
@@ -201,6 +200,12 @@ function resolveDependencies(sourceFile: SourceFile, root: string): {
   for (const call of sourceFile.getDescendantsOfKind(SyntaxKind.CallExpression)) {
     const found = callSpecifier(call);
     if (!found) continue;
+    if (found.unanalyzable) {
+      dependencies.push({ specifier: found.specifier, kind: found.kind, typeOnly: false,
+        external: false, resolved: false, unanalyzable: true,
+        ...sourceFile.getLineAndColumnAtPos(call.getStart()) });
+      continue;
+    }
     const resolved = ts.resolveModuleName(
       found.specifier,
       sourceFile.getFilePath(),

@@ -1,5 +1,5 @@
-import { AutopsiaConfig, FileNode, Violation } from '../types';
-import { isSuppressed } from '../ignores';
+import { AutopsiaConfig, Dependency, FileNode, Violation } from '../types';
+import { dependencySuppressed, isSuppressed } from '../ignores';
 
 /**
  * Regla 1 — Dirección de dependencias.
@@ -21,14 +21,16 @@ export function checkDependencyDirection(
     const allowed = rules.get(node.layer);
     if (allowed === null || allowed === undefined) continue;
 
-    for (const imp of node.internalImports) {
+    const occurrences = node.dependencies
+      ? node.dependencies.filter((d) => !d.external && d.resolvedPath && !d.typeOnly)
+      : node.internalImports.map((resolvedPath) => ({ resolvedPath }));
+    for (const occurrence of occurrences) {
+      const imp = occurrence.resolvedPath!;
       const targetLayer = layerByPath.get(imp);
       if (!targetLayer || targetLayer === node.layer) continue;
 
       if (!allowed.includes(targetLayer)) {
-        const evidence = node.dependencies?.find(
-          (dependency) => dependency.resolvedPath === imp && !dependency.typeOnly
-        );
+        const evidence = 'kind' in occurrence ? occurrence as Dependency : undefined;
         const violation: Violation = {
           rule: 'dependency-direction',
           severity: 'error',
@@ -37,7 +39,7 @@ export function checkDependencyDirection(
           message: `Capa "${node.layer}" no puede depender de "${targetLayer}"`,
           detail: `importa ${imp}`,
         };
-        if (isSuppressed(node, 'dependency-direction', { internal: imp })) {
+        if (evidence ? dependencySuppressed(evidence, 'dependency-direction') : isSuppressed(node, 'dependency-direction', { internal: imp })) {
           violation.suppressed = true;
         }
         violations.push(violation);

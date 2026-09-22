@@ -1,5 +1,5 @@
-import { AutopsiaConfig, FileNode, Violation } from '../types';
-import { isSuppressed } from '../ignores';
+import { AutopsiaConfig, Dependency, FileNode, Violation } from '../types';
+import { dependencySuppressed, isSuppressed } from '../ignores';
 
 function matchesModule(imported: string, configured: string): boolean {
   return imported === configured || imported.startsWith(configured + '/');
@@ -26,10 +26,14 @@ export function checkForbiddenExternal(
     const forbidden = forbiddenByLayer.get(node.layer);
     if (!forbidden) continue;
 
-    for (const ext of node.externalImports) {
+    const occurrences = node.dependencies
+      ? node.dependencies.filter((d) => d.external && node.externalImports.includes(d.specifier))
+      : node.externalImports.map((specifier) => ({ specifier }));
+    for (const occurrence of occurrences) {
+      const ext = occurrence.specifier;
       const hit = forbidden.find((f) => matchesModule(ext, f));
       if (hit) {
-        const evidence = node.dependencies?.find((dependency) => dependency.specifier === ext);
+        const evidence = 'kind' in occurrence ? occurrence as Dependency : undefined;
         const violation: Violation = {
           rule: 'forbidden-external',
           severity: 'error',
@@ -38,7 +42,7 @@ export function checkForbiddenExternal(
           message: `Capa "${node.layer}" importa módulo prohibido "${ext}"`,
           detail: `La capa debe mantenerse libre de "${hit}"`,
         };
-        if (isSuppressed(node, 'forbidden-external', { external: ext })) {
+        if (evidence ? dependencySuppressed(evidence, 'forbidden-external') : isSuppressed(node, 'forbidden-external', { external: ext })) {
           violation.suppressed = true;
         }
         violations.push(violation);

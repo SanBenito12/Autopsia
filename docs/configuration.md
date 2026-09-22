@@ -2,6 +2,10 @@
 
 Todo vive en `autopsia.config.json`, en la raíz de tu proyecto. `npx autopsia-rn init` lo genera detectando tu estructura; esta página explica cada campo para cuando quieras ajustarlo.
 
+Desde v0.4, `init` detecta tanto capas directamente bajo `src/` como bajo `src/features/<feature>/`. Genera patrones para las carpetas encontradas; vuelve a revisar el config al añadir nuevas funcionalidades. No infiere restricciones entre features ni configuraciones de monorepos. Con cobertura menor al 80%, muestra hasta cinco archivos sin capa para ayudarte a ajustar los patrones.
+
+`strict: true` exige un scan no vacío y rechaza dependencias calculadas (`import(variable)`, `require(variable)`) que no pueden resolverse estáticamente. Los templates sin interpolación sí se analizan. Un proyecto sin archivos `.ts`/`.tsx` muestra cobertura 0% y análisis incompleto. Las listas del config deben contener strings no vacíos; `strict` debe ser booleano y `rules` un objeto.
+
 Un config completo de referencia:
 
 ```json

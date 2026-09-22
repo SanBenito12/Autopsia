@@ -57,6 +57,13 @@ describe('saveBaseline / loadBaseline', () => {
 });
 
 describe('applyBaseline', () => {
+  it('no tolera ocurrencias adicionales del mismo problema', () => {
+    saveBaseline(tmpRoot, [violation({ line: 2 })]);
+    const duplicate = violation({ line: 20 });
+    const split = applyBaseline([violation({ line: 5 }), duplicate], loadBaseline(tmpRoot)!);
+    expect(split.tolerated).toHaveLength(1);
+    expect(split.fresh).toEqual([duplicate]);
+  });
   it('tolera una violación que ya estaba en el baseline', () => {
     const old = violation();
     saveBaseline(tmpRoot, [old]);

@@ -3,6 +3,8 @@ import * as fs from 'fs';
 import { AnalysisIssue, AnalysisIssueKind, ScanResult, Violation } from './types';
 
 const ISSUE_LABELS: Record<AnalysisIssueKind, string> = {
+  'empty-project': 'Sin archivos analizables',
+  'unanalyzable-import': 'Dependencias no analizables',
   'unclassified-file': 'Archivos sin capa',
   'unresolved-import': 'Imports internos sin resolver',
   'ambiguous-layer': 'Archivos con capa ambigua',
@@ -10,7 +12,7 @@ const ISSUE_LABELS: Record<AnalysisIssueKind, string> = {
 };
 
 export function analysisCoveragePercent(result: ScanResult): number {
-  if (result.totalFiles === 0) return 100;
+  if (result.totalFiles === 0) return 0;
   return Math.round(((result.analysis?.classifiedFiles ?? result.totalFiles) / result.totalFiles) * 1000) / 10;
 }
 
@@ -20,6 +22,8 @@ function formatPercent(value: number): string {
 
 function printIssueGroups(issues: AnalysisIssue[]): void {
   const order: AnalysisIssueKind[] = [
+    'empty-project',
+    'unanalyzable-import',
     'unclassified-file',
     'unresolved-import',
     'ambiguous-layer',
@@ -98,7 +102,8 @@ export function printReport(result: ScanResult): void {
     if (analysis.complete) {
       console.log(chalk.green.bold('  ✔ ANÁLISIS COMPLETO — no quedaron fronteras sin comprobar'));
     } else {
-      const status = coveragePct < 50 ? 'CONFIGURACIÓN INSUFICIENTE' : 'ANÁLISIS INCOMPLETO';
+      const status = result.totalFiles === 0 ? 'SIN ARCHIVOS ANALIZABLES'
+        : coveragePct < 50 ? 'CONFIGURACIÓN INSUFICIENTE' : 'ANÁLISIS INCOMPLETO';
       const color = coveragePct < 50 ? chalk.red.bold : chalk.yellow.bold;
       console.log(color(`  ⚠ ${status} — ${analysis.issues.length} problema(s)`));
       printIssueGroups(analysis.issues);

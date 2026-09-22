@@ -1,4 +1,8 @@
-import { FileNode } from './types';
+import { Dependency, FileNode } from './types';
+
+export function dependencySuppressed(dependency: Dependency, rule: string): boolean {
+  return dependency.suppressedRules?.some((name) => name === '*' || name === rule) ?? false;
+}
 
 /**
  * Comentarios de escape para excepciones documentadas:

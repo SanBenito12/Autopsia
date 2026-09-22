@@ -46,9 +46,21 @@ export function detectLayers(root: string): DetectedLayer[] {
     .filter((e) => e.isDirectory())
     .map((e) => e.name);
 
+  // Layer-first and one feature level: stop at the layer boundary so nested
+  // folders such as domain/services do not become overlapping layers.
+  const featuresDir = path.join(srcDir, 'features');
+  if (fs.existsSync(featuresDir) && fs.statSync(featuresDir).isDirectory()) {
+    for (const feature of fs.readdirSync(featuresDir, { withFileTypes: true })) {
+      if (!feature.isDirectory()) continue;
+      for (const layer of fs.readdirSync(path.join(featuresDir, feature.name), { withFileTypes: true })) {
+        if (layer.isDirectory()) dirs.push(`features/${feature.name}/${layer.name}`);
+      }
+    }
+  }
+
   const detected: DetectedLayer[] = [];
   for (const candidate of LAYER_CANDIDATES) {
-    const folders = dirs.filter((d) => candidate.folders.includes(d.toLowerCase()));
+    const folders = dirs.filter((d) => candidate.folders.includes(d.split('/').pop()!.toLowerCase())).sort();
     if (folders.length > 0) detected.push({ name: candidate.name, folders });
   }
   return detected;
@@ -116,6 +128,7 @@ export interface InitResult {
 }
 
 export interface InitCoverage {
+  unclassifiedExamples: string[];
   totalFiles: number;
   classifiedFiles: number;
   percent: number;
@@ -126,9 +139,10 @@ export function measureConfigCoverage(root: string, config: AutopsiaConfig): Ini
   const graph = buildGraph(root, config);
   const classifiedFiles = graph.filter((node) => node.layer !== null).length;
   const percent = graph.length === 0
-    ? 100
+    ? 0
     : Math.round((classifiedFiles / graph.length) * 1000) / 10;
-  return { totalFiles: graph.length, classifiedFiles, percent };
+  return { totalFiles: graph.length, classifiedFiles, percent,
+    unclassifiedExamples: graph.filter((node) => node.layer === null).slice(0, 5).map((node) => node.path) };
 }
 
 /**
@@ -188,6 +202,7 @@ export function runInit(root: string, force = false): number {
     if (lowCoverage) {
       console.log(chalk.yellow(`\n  ⚠ El config generado solo cubre ${coverageText}.`));
       console.log(chalk.gray('    Ajusta los patterns antes de confiar en el resultado del scan.'));
+      for (const file of coverage.unclassifiedExamples) console.log(chalk.gray(`    Sin capa: ${file}`));
     } else {
       console.log(chalk.green(`\n  ✔ Cobertura inicial del config: ${coverageText}`));
     }

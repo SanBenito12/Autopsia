@@ -79,9 +79,21 @@ This certifies **compliance with every configured architecture rule**. ESLint an
 
 Coverage is shown as a percentage. Autopsia separates unclassified files, unresolved imports, and ambiguous patterns; a configuration covering less than 50% is labeled `INSUFFICIENT CONFIGURATION`. Empty layers display `N/A`, never a misleading `100%`.
 
+## Compare architecture changes
+
+```bash
+npx autopsia-rn scan . -o before.json
+# Refactor your project, then:
+npx autopsia-rn scan . --compare before.json -o after.json
+```
+
+Shows new, resolved, and persistent violations, plus the change in classified-file coverage. Comparison includes baseline-tolerated debt and counts repeated occurrences; moving lines does not create new debt. JSON output includes a `comparison` field. `--compare` is informational and does not change `--ci` or update the baseline. Compare reports from the same project and configuration; rule/config changes also affect the result. Reports without coverage metadata show `N/A`.
+
+In v0.4, `init` also detects layers inside `src/features/*/` and lists examples of unclassified files when coverage is low. Strict CI rejects empty scans and computed `import()`/`require()` arguments that cannot be analyzed statically. String literals and template literals without interpolation are supported. Existing version-1 baselines remain compatible; additional occurrences of a known violation now count as new.
+
 ## Interactive graph
 
-`--html --open` generates a self-contained viewer: force-directed dependency graph, one color per layer, red edges for violating imports.
+`--html --open` generates a self-contained viewer: force-directed dependency graph, one color per layer, red edges for violating imports. D3 and report data are embedded, so the report works offline without a CDN.
 
 🔗 **[Live demo](https://sanbenito12.github.io/Autopsia/report.html)** · [docs site](https://sanbenito12.github.io/Autopsia/)
 
@@ -131,7 +143,7 @@ Scanned a production React Native app (~130 files): **25 violations in under 2 s
 - [x] Baseline for legacy projects (`--update-baseline`)
 - [x] `autopsia-ignore` escape comments
 - [x] Per-rule severity (`error` / `warning` / `off`)
-- [ ] Historical comparison (`--compare previous-report.json`)
+- [x] Historical comparison (`--compare previous-report.json`)
 - [ ] More rules: god files, business logic in components, orphan files
 
 ## Stack

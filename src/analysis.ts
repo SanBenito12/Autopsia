@@ -5,23 +5,26 @@ import { AnalysisCoverage, AnalysisIssue, AutopsiaConfig, FileNode } from './typ
 /** Valida errores de configuración que volverían ambiguo o incompleto el scan. */
 export function validateConfig(config: AutopsiaConfig): AnalysisIssue[] {
   const issues: AnalysisIssue[] = [];
+  const strings = (value: unknown): value is string[] => Array.isArray(value) && value.every((v) => typeof v === 'string' && v.trim().length > 0);
   if (!config || !Array.isArray(config.layers) || config.layers.length === 0) {
     return [{ kind: 'invalid-config', message: '"layers" debe contener al menos una capa' }];
   }
-  if (!Array.isArray(config.dataAccessModules)) {
+  if (!strings(config.dataAccessModules)) {
     issues.push({ kind: 'invalid-config', message: '"dataAccessModules" debe ser un arreglo' });
   }
-  if (!Array.isArray(config.noDirectDataAccessIn)) {
+  if (!strings(config.noDirectDataAccessIn)) {
     issues.push({ kind: 'invalid-config', message: '"noDirectDataAccessIn" debe ser un arreglo' });
   }
 
   const names = new Set<string>();
+  if (config.strict !== undefined && typeof config.strict !== 'boolean') issues.push({ kind: 'invalid-config', message: '"strict" debe ser booleano' });
+  if (config.ignore !== undefined && !strings(config.ignore)) issues.push({ kind: 'invalid-config', message: '"ignore" debe contener strings no vacíos' });
   for (const layer of config.layers) {
     if (!layer || typeof layer !== 'object') {
       issues.push({ kind: 'invalid-config', message: 'Cada entrada de "layers" debe ser un objeto' });
       continue;
     }
-    if (!layer.name || typeof layer.name !== 'string') {
+    if (typeof layer.name !== 'string' || !layer.name.trim()) {
       issues.push({ kind: 'invalid-config', message: 'Cada capa debe tener un nombre' });
       continue;
     }
@@ -29,10 +32,11 @@ export function validateConfig(config: AutopsiaConfig): AnalysisIssue[] {
       issues.push({ kind: 'invalid-config', message: `La capa "${layer.name}" está repetida` });
     }
     names.add(layer.name);
-    if (!Array.isArray(layer.patterns) || layer.patterns.length === 0) {
+    if (!strings(layer.patterns) || layer.patterns.length === 0) {
       issues.push({ kind: 'invalid-config', message: `La capa "${layer.name}" no tiene patterns` });
     }
-    if (layer.allowedDependencies !== undefined && !Array.isArray(layer.allowedDependencies)) {
+    if (layer.forbiddenExternal !== undefined && !strings(layer.forbiddenExternal)) issues.push({ kind: 'invalid-config', message: `forbiddenExternal de "${layer.name}" debe contener strings no vacíos` });
+    if (layer.allowedDependencies !== undefined && !strings(layer.allowedDependencies)) {
       issues.push({
         kind: 'invalid-config',
         message: `allowedDependencies de "${layer.name}" debe ser un arreglo`,
@@ -59,7 +63,7 @@ export function validateConfig(config: AutopsiaConfig): AnalysisIssue[] {
       });
     }
   }
-  if (config.rules !== undefined && (typeof config.rules !== 'object' || config.rules === null)) {
+  if (config.rules !== undefined && (typeof config.rules !== 'object' || config.rules === null || Array.isArray(config.rules))) {
     issues.push({ kind: 'invalid-config', message: '"rules" debe ser un objeto' });
   }
   for (const [rule, level] of Object.entries(
@@ -81,9 +85,11 @@ export function computeAnalysisCoverage(
   configIssues: AnalysisIssue[] = validateConfig(config),
 ): AnalysisCoverage {
   const issues = [...configIssues];
+  if (graph.length === 0) issues.push({ kind: 'empty-project', message: 'No hay archivos TypeScript analizables' });
   let classifiedFiles = 0;
   let ambiguousFiles = 0;
   let totalDependencies = 0;
+  let unanalyzableDependencies = 0;
   let resolvedInternalDependencies = 0;
   let unresolvedInternalDependencies = 0;
 
@@ -109,6 +115,13 @@ export function computeAnalysisCoverage(
 
     for (const dependency of node.dependencies ?? []) {
       totalDependencies++;
+      if (dependency.unanalyzable) {
+        unanalyzableDependencies++;
+        issues.push({ kind: 'unanalyzable-import', file: node.path, line: dependency.line,
+          message: `Dependencia no analizable estáticamente: ${dependency.specifier}`,
+          detail: `${dependency.kind} en línea ${dependency.line}` });
+        continue;
+      }
       if (dependency.external) continue;
       if (dependency.resolved) resolvedInternalDependencies++;
       else {
@@ -129,11 +142,14 @@ export function computeAnalysisCoverage(
     classifiedFiles,
     unclassifiedFiles,
     totalDependencies,
+    unanalyzableDependencies,
     resolvedInternalDependencies,
     unresolvedInternalDependencies,
     configErrors: configIssues.length,
     ambiguousFiles,
     complete:
+      graph.length > 0 &&
+      unanalyzableDependencies === 0 &&
       configIssues.length === 0 &&
       unclassifiedFiles === 0 &&
       ambiguousFiles === 0 &&

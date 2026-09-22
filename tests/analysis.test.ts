@@ -33,6 +33,14 @@ afterEach(() => {
 });
 
 describe('dependencias completas del scanner', () => {
+  it('marca llamadas calculadas como análisis incompleto, pero acepta templates literales', () => {
+    write('src/domain/value.ts', 'export const value = 1;');
+    write('src/presentation/screen.ts', 'const target = "../domain/value";\nimport(target);\nimport(`../domain/value`);');
+    const coverage = computeAnalysisCoverage(buildGraph(root, config), config);
+    expect(coverage.complete).toBe(false);
+    expect(coverage.resolvedInternalDependencies).toBe(1);
+    expect(coverage.issues).toContainEqual(expect.objectContaining({kind: 'unanalyzable-import', line: 2}));
+  });
   it('registra imports, reexports, require e import dinámico con línea', () => {
     write('src/domain/value.ts', 'export const value = 1;\n');
     write(
@@ -98,6 +106,20 @@ describe('dependencias completas del scanner', () => {
 });
 
 describe('validación y cobertura estricta', () => {
+  it('no certifica un proyecto vacío', () => {
+    const coverage = computeAnalysisCoverage([], config);
+    expect(coverage.complete).toBe(false);
+    expect(coverage.issues[0].kind).toBe('empty-project');
+  });
+
+  it.each([
+    { strict: 'true' }, { ignore: [123] }, { dataAccessModules: [null] },
+    { noDirectDataAccessIn: [123] }, { rules: [] },
+    { layers: [{ name: 'domain', patterns: [123] }] },
+    { layers: [{ name: 'domain', patterns: ['src/*'], forbiddenExternal: 'axios' }] },
+  ])('rechaza campos inválidos: %j', (invalid) => {
+    expect(validateConfig({ ...config, ...invalid } as unknown as AutopsiaConfig).length).toBeGreaterThan(0);
+  });
   it('detecta capas inexistentes y reglas desconocidas', () => {
     const invalid = {
       ...config,

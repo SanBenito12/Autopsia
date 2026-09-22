@@ -39,6 +39,8 @@ export type DependencyKind = 'import' | 'dynamic-import' | 'require' | 're-expor
 
 /** Evidencia de una dependencia encontrada en el AST. */
 export interface Dependency {
+  suppressedRules?: string[];
+  unanalyzable?: boolean;
   /** Texto escrito en el módulo, p. ej. "@/domain/User". */
   specifier: string;
   kind: DependencyKind;
@@ -79,6 +81,8 @@ export interface FileNode {
 }
 
 export type AnalysisIssueKind =
+  | 'empty-project'
+  | 'unanalyzable-import'
   | 'invalid-config'
   | 'ambiguous-layer'
   | 'unclassified-file'
@@ -93,6 +97,7 @@ export interface AnalysisIssue {
 }
 
 export interface AnalysisCoverage {
+  unanalyzableDependencies?: number;
   classifiedFiles: number;
   unclassifiedFiles: number;
   totalDependencies: number;
@@ -119,6 +124,7 @@ export interface Violation {
 }
 
 export interface ScanResult {
+  comparison?: ReportComparison;
   scannedAt: string;
   root: string;
   totalFiles: number;
@@ -133,4 +139,11 @@ export interface ScanResult {
   graph: FileNode[];
   /** Cobertura y problemas que pueden impedir certificar el resultado. */
   analysis?: AnalysisCoverage;
+}
+
+export interface ReportComparison {
+  added: Violation[];
+  resolved: Violation[];
+  persistent: Violation[];
+  coverage: { previous: number | null; current: number | null; delta: number | null };
 }

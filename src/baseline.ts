@@ -36,7 +36,7 @@ function posix(s: string): string {
   return s.replace(/\\/g, '/');
 }
 
-function toEntry(v: Violation): BaselineEntry {
+export function toEntry(v: Violation): BaselineEntry {
   const entry: BaselineEntry = {
     rule: v.rule,
     file: posix(v.file),
@@ -47,8 +47,8 @@ function toEntry(v: Violation): BaselineEntry {
 }
 
 /** Identidad estable de una violación (sin severidad ni línea). */
-function keyOf(v: BaselineEntry): string {
-  return [v.rule, v.file, v.message, v.detail ?? ''].join('|');
+export function keyOf(v: BaselineEntry): string {
+  return JSON.stringify([v.rule, v.file, v.message, v.detail ?? '']);
 }
 
 export function baselinePath(root: string): string {
@@ -81,12 +81,19 @@ export function applyBaseline(
   violations: Violation[],
   baseline: Baseline
 ): { fresh: Violation[]; tolerated: Violation[] } {
-  const known = new Set(baseline.violations.map(keyOf));
+  const known = new Map<string, number>();
+  for (const entry of baseline.violations) {
+    const key = keyOf(entry);
+    known.set(key, (known.get(key) ?? 0) + 1);
+  }
   const fresh: Violation[] = [];
   const tolerated: Violation[] = [];
 
   for (const v of violations) {
-    (known.has(keyOf(toEntry(v))) ? tolerated : fresh).push(v);
+    const key = keyOf(toEntry(v));
+    const remaining = known.get(key) ?? 0;
+    (remaining > 0 ? tolerated : fresh).push(v);
+    if (remaining > 0) known.set(key, remaining - 1);
   }
   return { fresh, tolerated };
 }
