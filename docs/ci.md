@@ -74,7 +74,7 @@ Eso es todo. Requisitos: `autopsia.config.json` commiteado (lo genera `npx autop
 **Fijar la versión** para builds reproducibles:
 
 ```yaml
-        run: npx autopsia-rn@0.2.0 scan . --ci
+        run: npx autopsia-rn@0.4.0 scan . --ci
 ```
 
 **Proyecto con path aliases** y tsconfig no estándar:
@@ -82,3 +82,15 @@ Eso es todo. Requisitos: `autopsia.config.json` commiteado (lo genera `npx autop
 ```yaml
         run: npx autopsia-rn scan . --ci --tsconfig ./tsconfig.app.json
 ```
+
+## Códigos de salida y comparación (v0.4)
+
+- `0`: scan permitido; sin errores nuevos en CI y, si `strict` está activo, análisis completo.
+- `1`: `--ci` detecta errores nuevos o análisis incompleto con `strict: true`. Esto incluye scans vacíos e imports calculados no analizables. Los warnings solos no fallan CI.
+- `2`: configuración inválida, rutas requeridas ausentes o reporte de comparación inválido.
+
+`--compare anterior.json` muestra deuda nueva/resuelta/persistente sin sustituir el baseline ni cambiar estos códigos. El reporte anterior se lee antes de escribir la salida, por lo que puedes usar la misma ruta para entrada y salida. La comparación incluye deuda tolerada y excluye violaciones suprimidas. Conserva la misma configuración para comparar refactorizaciones.
+
+## Verificación del paquete para mantenedores
+
+Con Node 22/24: `npm ci`, `npm run build`, `npm test` y `npm run test:package`. La última orden empaqueta e instala en un directorio temporal, ejecuta la CLI instalada y comprueba el HTML sin scripts externos. Puede necesitar red para resolver dependencias. El workflow repite la verificación en Linux, Windows y macOS y comprueba la CLI compilada con Node 18.

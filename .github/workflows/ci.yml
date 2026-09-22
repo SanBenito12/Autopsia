@@ -8,13 +8,17 @@ on:
 
 jobs:
   ci:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node: [22, 24]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ matrix.node }}
           cache: npm
 
       - name: Instalar dependencias
@@ -26,5 +30,24 @@ jobs:
       - name: Tests
         run: npm test
 
-      - name: Scan del fixture
-        run: npm run scan:fixture
+      - name: Build
+        run: npm run build
+
+      - name: Installed package
+        run: npm run test:package
+
+  minimum-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - run: node dist/index.js --version
+      - run: node dist/index.js scan fixtures/sample-app --html

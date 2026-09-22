@@ -123,6 +123,20 @@ Escaneé una app React Native en producción (~130 archivos): **25 violaciones e
 - ⚙️ [Configuración](docs/configuration.md) — cada campo de `autopsia.config.json`
 - 🤖 [CI](docs/ci.md) — receta de GitHub Actions con baseline
 
+## Comparar cambios de arquitectura
+
+```bash
+npx autopsia-rn scan . -o antes.json
+# Después de refactorizar:
+npx autopsia-rn scan . --compare antes.json -o despues.json
+```
+
+Muestra violaciones nuevas, resueltas y persistentes, además del cambio de cobertura de archivos clasificados. Incluye la deuda tolerada por el baseline y cuenta ocurrencias repetidas; mover líneas no crea deuda nueva. El JSON incorpora `comparison`. La comparación es informativa: no modifica `--ci` ni actualiza el baseline. Compara el mismo proyecto y configuración; cambiar reglas o patrones también cambia el resultado. La cobertura ausente en reportes antiguos aparece como `N/A`.
+
+En v0.4, `init` detecta capas dentro de `src/features/*/` y muestra ejemplos de archivos sin clasificar cuando la cobertura es baja. El modo estricto rechaza scans vacíos y argumentos calculados de `import()`/`require()` que no pueden analizarse estáticamente. Admite strings literales y templates sin interpolación. Los baselines de versión 1 siguen siendo compatibles; una ocurrencia adicional del mismo problema ahora cuenta como nueva.
+
+El visor HTML incluye D3 y los datos del reporte: funciona sin conexión y sin CDN.
+
 ## Roadmap
 
 - [x] Visor interactivo del grafo (`--html --open`)
@@ -131,7 +145,7 @@ Escaneé una app React Native en producción (~130 archivos): **25 violaciones e
 - [x] Baseline para proyectos legacy (`--update-baseline`)
 - [x] Comentarios de escape `autopsia-ignore`
 - [x] Severidad por regla (`error` / `warning` / `off`)
-- [ ] Comparación histórica (`--compare reporte-anterior.json`)
+- [x] Comparación histórica (`--compare reporte-anterior.json`)
 - [ ] Reglas extra: god files, lógica de negocio en componentes, archivos huérfanos
 
 ## Stack

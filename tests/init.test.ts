@@ -24,6 +24,14 @@ afterEach(() => {
 });
 
 describe('detectLayers', () => {
+  it('detecta capas por feature sin solapar carpetas dentro de domain', () => {
+    mkdirs('src/features/auth/domain/services', 'src/features/auth/presentation', 'src/features/cart/data', 'src/domain');
+    expect(detectLayers(tmpRoot)).toEqual([
+      { name: 'presentation', folders: ['features/auth/presentation'] },
+      { name: 'domain', folders: ['domain', 'features/auth/domain'] },
+      { name: 'data', folders: ['features/cart/data'] },
+    ]);
+  });
   it('detecta las cuatro capas con nombres canónicos', () => {
     mkdirs('src/presentation', 'src/domain', 'src/data', 'src/infrastructure');
     const detected = detectLayers(tmpRoot);
@@ -105,6 +113,7 @@ describe('buildConfig', () => {
       totalFiles: 2,
       classifiedFiles: 1,
       percent: 50,
+      unclassifiedExamples: [path.join('src', 'features', 'auth', 'Login.tsx')],
     });
   });
 });

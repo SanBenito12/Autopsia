@@ -1,5 +1,5 @@
-import { AutopsiaConfig, FileNode, Violation } from '../types';
-import { isSuppressed } from '../ignores';
+import { AutopsiaConfig, Dependency, FileNode, Violation } from '../types';
+import { dependencySuppressed, isSuppressed } from '../ignores';
 
 function matchesModule(imported: string, configured: string): boolean {
   return imported === configured || imported.startsWith(configured + '/');
@@ -20,10 +20,14 @@ export function checkDirectDataAccess(
   for (const node of nodes) {
     if (!node.layer || !forbiddenLayers.has(node.layer)) continue;
 
-    for (const ext of node.externalImports) {
+    const occurrences = node.dependencies
+      ? node.dependencies.filter((d) => d.external && node.externalImports.includes(d.specifier))
+      : node.externalImports.map((specifier) => ({ specifier }));
+    for (const occurrence of occurrences) {
+      const ext = occurrence.specifier;
       const hit = config.dataAccessModules.find((m) => matchesModule(ext, m));
       if (hit) {
-        const evidence = node.dependencies?.find((dependency) => dependency.specifier === ext);
+        const evidence = 'kind' in occurrence ? occurrence as Dependency : undefined;
         const violation: Violation = {
           rule: 'direct-data-access',
           severity: 'error',
@@ -32,7 +36,7 @@ export function checkDirectDataAccess(
           message: `Acceso directo a datos/red ("${ext}") en capa "${node.layer}"`,
           detail: 'Debe pasar por un repositorio o caso de uso',
         };
-        if (isSuppressed(node, 'direct-data-access', { external: ext })) {
+        if (evidence ? dependencySuppressed(evidence, 'direct-data-access') : isSuppressed(node, 'direct-data-access', { external: ext })) {
           violation.suppressed = true;
         }
         violations.push(violation);

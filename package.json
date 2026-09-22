@@ -1,6 +1,6 @@
 {
   "name": "autopsia-rn",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Auditor de Clean Architecture para proyectos React Native / TypeScript. ESLint te dice si tu código está bien escrito; Autopsia te dice si tu arquitectura está bien construida.",
   "bin": {
     "autopsia": "dist/index.js"
@@ -25,9 +25,10 @@
   "homepage": "https://github.com/SanBenito12/Autopsia#readme",
   "scripts": {
     "dev": "tsx src/index.ts",
-    "build": "tsc && chmod +x dist/index.js",
+    "build": "tsc && node scripts/build.cjs",
+    "test:package": "node scripts/test-package.cjs",
     "test": "vitest run",
-    "prepublishOnly": "npm run build && npm test",
+    "prepublishOnly": "npm run build && npm test && npm run test:package",
     "scan:fixture": "tsx src/index.ts scan fixtures/sample-app --config fixtures/sample-app/autopsia.config.json",
     "scan:alias": "tsx src/index.ts scan fixtures/alias-app --config fixtures/alias-app/autopsia.config.json",
     "demo:html": "tsx src/index.ts scan fixtures/sample-app --config fixtures/sample-app/autopsia.config.json --html demo/report.html"
@@ -47,6 +48,7 @@
     "ts-morph": "^23.0.0"
   },
   "devDependencies": {
+    "d3": "^7.9.0",
     "@types/node": "^26.1.1",
     "tsx": "^4.19.0",
     "typescript": "^5.5.0",

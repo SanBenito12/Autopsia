@@ -6,6 +6,7 @@ import { parseIgnoreDirectives } from '../src/ignores';
 import { buildGraph } from '../src/scanner';
 import { checkDependencyDirection } from '../src/rules/dependency-direction';
 import { checkDirectDataAccess } from '../src/rules/direct-data-access';
+import { checkForbiddenExternal } from '../src/rules/forbidden-external';
 import { checkCircularDeps } from '../src/rules/circular-deps';
 import { AutopsiaConfig } from '../src/types';
 
@@ -185,5 +186,40 @@ describe('supresión de violaciones vía comentarios (integración)', () => {
     const graph = buildGraph(tmpRoot, config);
     const node = graph.find((n) => n.path === path.join('src', 'presentation', 'Screen.ts'));
     expect(node?.suppressions).toBeUndefined();
+  });
+
+  it('mantiene línea y supresión independientes para imports repetidos', () => {
+    write('src/presentation/Screen.ts', [
+      '// autopsia-ignore-next-line direct-data-access',
+      "import axios from 'axios';",
+      "const second = require('axios');",
+      '// autopsia-ignore-next-line dependency-direction',
+      "import { repo } from '../data/Repo';",
+      "const other = require('../data/Repo');",
+    ].join('\n'));
+    const graph = buildGraph(tmpRoot, config);
+    const external = checkDirectDataAccess(graph, config);
+    expect(external.map((v) => [v.line, !!v.suppressed])).toEqual([[2, true], [3, false]]);
+    const internal = checkDependencyDirection(graph, config);
+    expect(internal.map((v) => [v.line, !!v.suppressed])).toEqual([[5, true], [6, false]]);
+  });
+
+  it('aplica next-line a imports multilínea y no a otros imports prohibidos', () => {
+    write('src/domain/Entity.ts', [
+      '// autopsia-ignore-next-line forbidden-external',
+      'import {', '  thing', '} from "react";',
+      'const another = require("react");',
+    ].join('\n'));
+    const custom = { ...config, layers: config.layers.map((layer) => ({ ...layer, forbiddenExternal: ['react'] })) };
+    const violations = checkForbiddenExternal(buildGraph(tmpRoot, custom), custom);
+    expect(violations.map((v) => [v.line, !!v.suppressed])).toEqual([[4, true], [5, false]]);
+  });
+
+  it('un ciclo sigue activo si hay otra ocurrencia no suprimida de la misma arista', () => {
+    write('src/presentation/a.ts', '// autopsia-ignore-next-line circular-deps\nimport "./b";\nrequire("./b");');
+    write('src/presentation/b.ts', 'import "./a";');
+    const cycles = checkCircularDeps(buildGraph(tmpRoot, config));
+    expect(cycles).toHaveLength(1);
+    expect(cycles[0].suppressed).toBeUndefined();
   });
 });

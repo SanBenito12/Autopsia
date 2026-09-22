@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.4.0] - 2026-09-22
+
+### Added
+
+- `scan --compare <reporte.json>` muestra deuda nueva, resuelta y persistente, incluyendo baseline, y cambios de cobertura; exporta el resultado en `comparison` del JSON.
+- `init` detecta capas en `src/features/*/` y muestra ejemplos de archivos sin clasificar cuando la cobertura es baja.
+- CI en Linux, Windows y macOS con Node 22/24, comprobación del runtime mínimo Node 18 y prueba de instalación del paquete generado.
+- Visor HTML sin conexión: D3 y su licencia se incluyen en el paquete; el reporte ya no depende de un CDN.
+
+### Fixed
+
+- Excepciones y líneas de evidencia por ocurrencia: ignorar un import no silencia otros imports al mismo módulo. Se respetan comentarios anteriores a imports multilínea.
+- Baseline con conteo de ocurrencias: las repeticiones adicionales son deuda nueva sin invalidar entradas por cambios de línea. Formato v1 compatible.
+- Los imports calculados no analizables y los proyectos sin archivos impiden declarar completo el análisis y fallan CI con `strict: true`.
+- Soporte de templates literales sin interpolación en `import()` y `require()`.
+- Validación de tipos y elementos de configuración antes del scan.
+- Actualización de dependencias compatibles para resolver los avisos de seguridad detectados.
+
+### Migration
+
+- Los scans estrictos antes aprobados pueden fallar si estaban vacíos, contenían dependencias calculadas o nuevas repeticiones de deuda tolerada. Revisar esos casos antes de actualizar CI.
+- `--compare` no cambia el criterio de fallo de CI. Requiere reportes del mismo proyecto y configuración para interpretar el cambio de deuda.
+- Node >=18 se conserva para ejecutar la CLI; desarrollo y tests usan Node 22/24.
+
 ## [0.3.1] - 2026-07-21
 
 Patch de claridad basado en scans reales de proyectos layer-first y feature-first.
@@ -76,6 +100,7 @@ Versión inicial, publicada en npm como [`autopsia-rn`](https://www.npmjs.com/pa
 - Modo CI (`--ci`): exit code 1 si hay violaciones de severidad error.
 - Suite de tests (Vitest) y CI en GitHub Actions.
 
+[0.4.0]: https://github.com/SanBenito12/Autopsia/releases/tag/v0.4.0
 [0.3.1]: https://github.com/SanBenito12/Autopsia/releases/tag/v0.3.1
 [0.3.0]: https://github.com/SanBenito12/Autopsia/releases/tag/v0.3.0
 [0.2.1]: https://github.com/SanBenito12/Autopsia/releases/tag/v0.2.1

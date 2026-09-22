@@ -11,13 +11,14 @@ import { computeHealth, printReport, writeJson } from './reporter';
 import { openInBrowser, writeHtml } from './viewer';
 import { runInit } from './init';
 import { computeAnalysisCoverage, validateConfig } from './analysis';
+import { compareReports, loadReport, printComparison } from './compare';
 
 const program = new Command();
 
 program
   .name('autopsia')
   .description('Auditor de Clean Architecture para proyectos React Native / TypeScript')
-  .version('0.3.1')
+  .version(require('../package.json').version)
   .addHelpText(
     'after',
     `
@@ -40,6 +41,7 @@ program
   .option('--html [file]', 'Generar visor HTML interactivo del grafo (default: autopsia-report.html)')
   .option('--open', 'Abrir el visor HTML en el navegador al terminar (implica --html)')
   .option('--ci', 'Modo CI: exit code 1 si hay violaciones de severidad error')
+  .option('--compare <file>', 'Comparar deuda y cobertura con un reporte JSON anterior')
   .option('--update-baseline', 'Guardar las violaciones actuales en autopsia-baseline.json como toleradas')
   .option('--no-baseline', 'Ignorar el baseline existente en este scan')
   .addHelpText(
@@ -51,8 +53,13 @@ Ejemplos:
   $ autopsia scan . --update-baseline   tolera las violaciones actuales; solo fallará lo nuevo
   $ autopsia scan . --ci                exit code 1 si hay violaciones (nuevas) de severidad error`
   )
-  .action((scanPath: string, opts: { config: string; output?: string; tsconfig?: string; html?: string | boolean; open?: boolean; ci?: boolean; updateBaseline?: boolean; baseline: boolean }) => {
+  .action((scanPath: string, opts: { config: string; compare?: string; output?: string; tsconfig?: string; html?: string | boolean; open?: boolean; ci?: boolean; updateBaseline?: boolean; baseline: boolean }) => {
     const root = path.resolve(scanPath);
+    let previous: ScanResult | undefined;
+    if (opts.compare) {
+      try { previous = loadReport(opts.compare); }
+      catch (error) { console.error(chalk.red(`✖ No se pudo comparar: ${error instanceof Error ? error.message : String(error)}`)); process.exit(2); }
+    }
     if (!fs.existsSync(root)) {
       console.error(chalk.red(`✖ La ruta no existe: ${root}`));
       process.exit(2);
@@ -139,6 +146,10 @@ Ejemplos:
     };
 
     printReport(result);
+    if (previous) {
+      result.comparison = compareReports(previous, result);
+      printComparison(result.comparison);
+    }
 
     if (opts.updateBaseline) {
       printBaselineSaved(saveBaseline(root, allViolations), allViolations.length);
