@@ -1,0 +1,164 @@
+[English](configuration.md) · Español
+
+# Configuración
+
+Todo vive en `autopsia.config.json`, en la raíz de tu proyecto. `npx autopsia-rn --lang es init` lo genera detectando tu estructura; esta página explica cada campo para cuando quieras ajustarlo.
+
+Desde v0.4, `init` detecta tanto capas directamente bajo `src/` como bajo `src/features/<feature>/`. Genera patrones para las carpetas encontradas; vuelve a revisar el config al añadir nuevas funcionalidades. No infiere restricciones entre features ni configuraciones de monorepos. Con cobertura menor al 80%, muestra hasta cinco archivos sin capa para ayudarte a ajustar los patrones.
+
+`strict: true` exige un scan no vacío y rechaza dependencias calculadas (`import(variable)`, `require(variable)`) que no pueden resolverse estáticamente. Los templates sin interpolación sí se analizan. Un proyecto sin archivos `.ts`/`.tsx` muestra cobertura 0% y análisis incompleto. Las listas del config deben contener strings no vacíos; `strict` debe ser booleano y `rules` un objeto.
+
+Un config completo de referencia:
+
+```json
+{
+  "layers": [
+    {
+      "name": "presentation",
+      "patterns": ["src/presentation/*", "src/screens/*"],
+      "allowedDependencies": ["domain"]
+    },
+    {
+      "name": "domain",
+      "patterns": ["src/domain/*"],
+      "allowedDependencies": [],
+      "forbiddenExternal": ["react", "react-native", "axios", "@supabase"]
+    },
+    {
+      "name": "data",
+      "patterns": ["src/data/*"],
+      "allowedDependencies": ["domain", "infrastructure"]
+    },
+    {
+      "name": "infrastructure",
+      "patterns": ["src/infrastructure/*"],
+      "allowedDependencies": ["domain"]
+    }
+  ],
+  "dataAccessModules": ["axios", "@supabase/supabase-js", "@react-native-async-storage/async-storage"],
+  "noDirectDataAccessIn": ["presentation"],
+  "strict": true,
+  "ignore": ["src/legacy"],
+  "rules": {
+    "dependency-direction": "error",
+    "direct-data-access": "error",
+    "forbidden-external": "error",
+    "circular-deps": "error"
+  }
+}
+```
+
+## `strict`
+
+Los configs generados por `autopsia init` usan `"strict": true`. Además de evaluar las reglas, exige cobertura completa:
+
+- cero archivos sin capa;
+- cero archivos que coincidan con más de una capa;
+- cero imports internos sin resolver;
+- cero referencias inválidas en el config.
+
+Con `scan --ci`, cualquiera de estas condiciones produce exit code 1. Sin modo estricto se siguen mostrando los problemas de cobertura, pero no hacen fallar CI, preservando compatibilidad con proyectos existentes.
+
+`autopsia init` mide la cobertura inicial del config que genera. Si clasifica menos del 80% de los archivos, avisa que la detección fue parcial y pide ajustar los `patterns` antes de confiar en el scan. Esto es frecuente en proyectos organizados por features (`src/features/*`) o con composition root (`src/app`, `src/di`).
+
+## `layers`
+
+La lista de capas de tu arquitectura. Cada capa:
+
+| Campo | Qué hace |
+|---|---|
+| `name` | Nombre de la capa. Aparece en el reporte y se usa en `allowedDependencies` de otras capas. |
+| `patterns` | Patrones de ruta que identifican los archivos de la capa. `*` matchea cualquier cosa (incluyendo subcarpetas): `"src/domain/*"` cubre `src/domain/entities/User.ts`. Sin `*`, el patrón matchea como substring. Case-insensitive. |
+| `allowedDependencies` | De qué capas puede importar esta capa. `[]` = de ninguna. **Si se omite, la capa no tiene restricción** (útil mientras migras capa por capa). |
+| `forbiddenExternal` | Paquetes npm prohibidos en esta capa. Matchea por prefijo de paquete: `"@supabase"` bloquea `@supabase/supabase-js`. |
+
+Un archivo se clasifica con la **primera** capa cuyos patterns matcheen — si un archivo podría caer en dos, ordena la más específica primero. Los archivos que no matchean ninguna capa no se evalúan (el reporte dice cuántos quedaron sin capa).
+
+### ¿Por qué esos `allowedDependencies` por defecto?
+
+En Clean Architecture las dependencias apuntan **hacia adentro**: todas las capas pueden conocer al `domain`, y el `domain` no conoce a nadie. Por eso el default de `init` es:
+
+- `presentation → domain` — la UI consume casos de uso.
+- `data → domain, infrastructure` — los repositorios implementan contratos del domain apoyándose en clientes de infrastructure.
+- `infrastructure → domain` — sí, también: un `UserRepositoryImpl` en infrastructure necesita importar la interfaz `UserRepository` y los `DomainErrors` que va a lanzar. Prohibirlo (versiones ≤ 0.2.0 generaban `[]`) marcaba como violación cada implementación de un contrato — puros falsos positivos.
+- `domain → nada` — es el centro; si necesita algo de afuera, define una interfaz y que afuera la implementen.
+
+Lo prohibido es la flecha inversa (`domain → data`, `domain → infrastructure`): el negocio no debe saber cómo se habla con la red o el storage.
+
+### Estructuras no estándar
+
+`patterns` acepta cualquier ruta, así que no necesitas carpetas llamadas "presentation". Ejemplos:
+
+```json
+{ "name": "presentation", "patterns": ["app/*", "src/components/*"] }
+{ "name": "domain",       "patterns": ["src/core/*", "packages/business-logic/*"] }
+```
+
+Monorepo con paquetes por capa:
+
+```json
+{ "name": "domain", "patterns": ["packages/domain/*"] }
+```
+
+## `dataAccessModules`
+
+Los paquetes npm que Autopsia considera "acceso directo a datos/red" para la regla [`direct-data-access`](rules.es.md#direct-data-access). Agrega los clientes que use tu proyecto:
+
+```json
+"dataAccessModules": ["axios", "ky", "@tanstack/react-query", "firebase", "@react-native-async-storage/async-storage"]
+```
+
+## `noDirectDataAccessIn`
+
+En qué capas esos módulos son violación. Típicamente `["presentation"]`; agrega `"domain"` si no usas `forbiddenExternal` para eso.
+
+## `ignore`
+
+Carpetas a excluir del análisis (además de las que se ignoran siempre: `node_modules`, `dist`, `build`, `.git`, `coverage`, `__tests__`, `__mocks__` y archivos `*.test.*` / `*.spec.*`):
+
+```json
+"ignore": ["src/legacy", "e2e"]
+```
+
+## `rules`
+
+Severidad por regla — la sección es opcional y su default es todo `"error"`:
+
+| Nivel | Efecto |
+|---|---|
+| `"error"` | Se reporta en rojo y falla `scan --ci` (default) |
+| `"warning"` | Se reporta en amarillo; `--ci` no falla |
+| `"off"` | La regla no corre |
+
+`"warning"` es el punto medio ideal al adoptar una regla nueva: la ves en cada scan sin romper el build de nadie.
+
+## Baseline (`autopsia-baseline.json`)
+
+No es parte del config: es un archivo aparte que genera `scan --update-baseline` con las violaciones toleradas ([guía](getting-started.es.md#adopting-autopsia-in-a-legacy-project)). Se busca en la raíz escaneada. Commitéalo. `--no-baseline` lo ignora para un scan puntual.
+
+## Path aliases (`@/*`)
+
+Si tu proyecto importa con aliases (`import { X } from '@/domain/...'`), Autopsia los resuelve usando el `tsconfig.json` de la raíz escaneada automáticamente. Si tu tsconfig con `paths` es otro:
+
+```bash
+npx autopsia-rn --lang es scan . --tsconfig ./tsconfig.app.json
+```
+
+## Flags de `scan` (referencia rápida)
+
+| Flag | Qué hace |
+|---|---|
+| `-c, --config <file>` | Ruta al config (default: `autopsia.config.json` en la raíz escaneada) |
+| `-o, --output <file>` | Guarda el reporte completo en JSON |
+| `--html [file]` | Genera el visor interactivo (default: `autopsia-report.html`) |
+| `--open` | Abre el visor al terminar (implica `--html`) |
+| `--ci` | Exit code 1 si hay violaciones nuevas de severidad `error` |
+| `--update-baseline` | Registra las violaciones actuales como toleradas |
+| `--no-baseline` | Ignora el baseline en este scan |
+| `--tsconfig <file>` | tsconfig a usar para resolver path aliases |
+
+## Idioma y alcance (0.5)
+
+La salida predeterminada está en inglés. Usa `--lang es` antes o después de `scan` o `init` para mostrar español, incluido el HTML. El JSON y baseline v1 mantienen sus mensajes canónicos en español para conservar compatibilidad; los metadatos `diagnostic` son opcionales. Los reportes antiguos sin ellos muestran su texto original.
+
+Autopsia comprueba dependencias contra reglas configuradas. No certifica toda la arquitectura ni detecta llamadas globales a `fetch()`. Los imports exclusivamente de tipos se excluyen de las reglas.

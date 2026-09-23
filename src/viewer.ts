@@ -1,3 +1,4 @@
+import { t, getLocale, present } from "./i18n";
 import chalk from 'chalk';
 import { spawn } from 'child_process';
 import * as fs from 'fs';
@@ -41,12 +42,16 @@ export function generateHtml(result: ScanResult): string {
   const licensePath = fs.existsSync(bundled) ? path.join(__dirname, 'vendor', 'D3-LICENSE')
     : path.resolve(path.dirname(d3Path), '../LICENSE');
   const license = fs.readFileSync(licensePath, 'utf-8');
-  const payload = JSON.stringify({ result, violationEdges: violationEdges(result) })
+  const payload = JSON.stringify({ result: { ...result,
+    violations: result.violations.map(v => present(v)),
+    tolerated: result.tolerated?.map(v => present(v)),
+    analysis: result.analysis ? { ...result.analysis, issues: result.analysis.issues.map(i => present(i)) } : undefined,
+  }, violationEdges: violationEdges(result) })
     // Evita cerrar el <script> si alguna ruta contiene "</script>"
     .replace(/</g, '\\u003c');
 
   return `<!DOCTYPE html>
-<html lang="es">
+<html lang="${getLocale()}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -172,6 +177,14 @@ export function generateHtml(result: ScanResult): string {
   .violation-item .file { color: var(--ink); word-break: break-all; }
   .violation-item .msg { color: var(--ink-2); margin-top: 2px; }
   .violation-item .detail { color: var(--muted); margin-top: 2px; word-break: break-all; }
+  @media (max-width: 640px) {
+    body { overflow: auto; height: auto; min-height: 100dvh; }
+    main { flex-direction: column; min-height: 80dvh; }
+    #graph { min-height: 45dvh; }
+    aside { width: 100%; max-height: none; border-left: 0; border-top: 1px solid var(--hairline); }
+    header { gap: 16px; padding: 14px; }
+    .meta { overflow-wrap: anywhere; }
+  }
 </style>
 </head>
 <body>
@@ -187,7 +200,7 @@ export function generateHtml(result: ScanResult): string {
     <div class="legend" id="legend"></div>
   </div>
   <aside>
-    <h2 id="panel-title">Violaciones</h2>
+    <h2 id="panel-title"></h2>
     <div id="violations"></div>
   </aside>
 </main>
@@ -235,8 +248,8 @@ const radiusOf = (n) => 5 + Math.min(6, Math.sqrt(degree.get(n.path) ?? 0) * 2);
 const classifiedFiles = result.analysis?.classifiedFiles ?? result.totalFiles;
 const coveragePct = result.totalFiles === 0 ? 0 : Math.round(classifiedFiles / result.totalFiles * 1000) / 10;
 document.getElementById('meta').textContent =
-  result.root + ' · ' + result.totalFiles + ' archivos · cobertura ' + coveragePct + '% · ' +
-  new Date(result.scannedAt).toLocaleString();
+  result.root + ' · ' + result.totalFiles + ${JSON.stringify(t("viewer.filesCoverage"))} + coveragePct + '% · ' +
+  new Date(result.scannedAt).toLocaleString('${getLocale()}');
 
 const healthColor = (pct) => pct >= 90 ? 'var(--good)' : pct >= 70 ? 'var(--warning)' : 'var(--critical)';
 const healthEl = document.getElementById('health');
@@ -282,11 +295,11 @@ if (nodes.some((n) => !n.layer)) {
   const dot = document.createElement('span');
   dot.className = 'dot';
   dot.style.background = UNLAYERED;
-  legendRow(dot, 'sin capa');
+  legendRow(dot, ${JSON.stringify(t("viewer.unlayered"))});
 }
 const line = document.createElement('span');
 line.className = 'line';
-legendRow(line, 'import con violación');
+legendRow(line, ${JSON.stringify(t("viewer.badImport"))});
 
 // ---- Grafo force-directed ----
 const graphEl = document.getElementById('graph');
@@ -372,11 +385,11 @@ node
     const sub = document.createElement('div');
     sub.className = 'sub';
     const layer = document.createElement('span');
-    layer.textContent = d.layer ?? 'sin capa';
+    layer.textContent = d.layer ?? ${JSON.stringify(t("viewer.unlayered"))};
     layer.style.color = colorOf(d);
     const viols = violationsByFile.get(d.path) ?? 0;
     const v = document.createElement('span');
-    v.textContent = viols === 1 ? '1 violación' : viols + ' violaciones';
+    v.textContent = viols === 1 ? ${JSON.stringify(t("viewer.oneViolation"))} : viols + ${JSON.stringify(t("viewer.violations"))};
     if (viols > 0) v.className = 'viol';
     sub.append(layer, v);
     tooltip.append(p, sub);
@@ -416,14 +429,14 @@ svg.on('click', () => {
 });
 
 const panel = document.getElementById('violations');
-document.getElementById('panel-title').textContent = 'Violaciones (' + result.violations.length + ')';
+document.getElementById('panel-title').textContent = ${JSON.stringify(t("viewer.panel"))} + result.violations.length + ')';
 if (result.violations.length === 0) {
   const ok = document.createElement('div');
   const complete = result.analysis?.complete !== false;
   ok.className = complete ? 'clean' : 'incomplete';
   ok.textContent = complete
-    ? '✔ Sin violaciones. Arquitectura verificada.'
-    : '⚠ Sin violaciones detectadas, pero el análisis está incompleto.';
+    ? ${JSON.stringify(t("viewer.clean"))}
+    : ${JSON.stringify(t("viewer.incomplete"))};
   panel.append(ok);
 }
 const byRule = new Map();
@@ -483,7 +496,7 @@ export function writeHtml(result: ScanResult, outPath: string): void {
   const resolved = path.resolve(outPath);
   fs.mkdirSync(path.dirname(resolved), { recursive: true });
   fs.writeFileSync(resolved, generateHtml(result), 'utf-8');
-  console.log(chalk.gray(`  Visor HTML guardado en ${outPath}`));
+  console.log(chalk.gray(t("viewer.saved", {p0: outPath})));
   console.log('');
 }
 
@@ -499,7 +512,7 @@ export function openInBrowser(file: string): void {
 
   const child = spawn(cmd, args, { detached: true, stdio: 'ignore' });
   child.on('error', () => {
-    console.log(chalk.yellow(`  No se pudo abrir automáticamente. Ábrelo manualmente: ${resolved}`));
+    console.log(chalk.yellow(t("viewer.openError", {p0: resolved})));
   });
   child.unref();
 }

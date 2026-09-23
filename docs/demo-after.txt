@@ -1,0 +1,49 @@
+
+  Scanning fixtures/sample-app ...
+
+  🔬 AUTOPSIA — Architecture report
+  fixtures/sample-app · 8 files analyzed
+
+  Evaluated file health
+  presentation     ███████████████░░░░░ 75% (4 files)
+  domain           ██████████░░░░░░░░░░ 50% (2 files)
+  data             ████████████████████ 100% (1 files)
+  infrastructure   ████████████████████ 100% (1 files)
+
+  Analysis coverage
+  Architecture coverage        100% (8 / 8 files)
+  Internal dependencies           8 resolved · 0 unresolved
+  ✔ COMPLETE ANALYSIS — all included files and dependencies checked
+
+  ✖ dependency-direction — 2 violation(s)
+    src/domain/usecases/GetEventsUseCase.ts:3
+      Layer "domain" cannot depend on "data"
+      ↳ imports src/data/repositories/EventRepository.ts
+    src/presentation/screens/HomeScreen.tsx:3
+      Layer "presentation" cannot depend on "data"
+      ↳ imports src/data/repositories/EventRepository.ts
+
+  ✖ direct-data-access — 1 violation(s)
+    src/presentation/screens/HomeScreen.tsx:2
+      Direct data/network access ("axios") in layer "presentation"
+      ↳ Route access through a repository or use case
+
+  ✖ forbidden-external — 1 violation(s)
+    src/domain/usecases/GetEventsUseCase.ts:1
+      Layer "domain" imports forbidden module "axios"
+      ↳ Keep this layer independent of "axios"
+
+  Files with the most violations
+     2  src/domain/usecases/GetEventsUseCase.ts
+     2  src/presentation/screens/HomeScreen.tsx
+
+  Total: 4 violations in 2 files
+
+  Comparison: 0 new · 1 resolved · 4 persistent
+  Coverage: 100% → 100% · change 0 percentage points
+    Resolved: src/presentation/screens/helperA.ts:1 · circular-deps · Circular dependency detected (2 files)
+
+  JSON report saved to fixtures/sample-app/after.json
+
+  Tip: add --html --open to explore the interactive graph
+

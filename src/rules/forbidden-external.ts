@@ -1,3 +1,4 @@
+import { format } from "../i18n";
 import { AutopsiaConfig, Dependency, FileNode, Violation } from '../types';
 import { dependencySuppressed, isSuppressed } from '../ignores';
 
@@ -34,13 +35,13 @@ export function checkForbiddenExternal(
       const hit = forbidden.find((f) => matchesModule(ext, f));
       if (hit) {
         const evidence = 'kind' in occurrence ? occurrence as Dependency : undefined;
-        const violation: Violation = {
+        const violation: Violation = { diagnostic: { message: { code: "rule.external", params: {p0: node.layer, p1: ext} }, detail: { code: "rule.free", params: {p0: hit} } },
           rule: 'forbidden-external',
           severity: 'error',
           file: node.path,
           line: evidence?.line,
-          message: `Capa "${node.layer}" importa módulo prohibido "${ext}"`,
-          detail: `La capa debe mantenerse libre de "${hit}"`,
+          message: format("rule.external", {p0: node.layer, p1: ext}, "es"),
+          detail: format("rule.free", {p0: hit}, "es"),
         };
         if (evidence ? dependencySuppressed(evidence, 'forbidden-external') : isSuppressed(node, 'forbidden-external', { external: ext })) {
           violation.suppressed = true;

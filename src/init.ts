@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import chalk from 'chalk';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -165,13 +166,13 @@ export function initProject(root: string, force = false): InitResult {
 
 /** Ejecuta init desde la CLI, con salida en consola. Devuelve el exit code. */
 export function runInit(root: string, force = false): number {
-  console.log(chalk.gray(`\n  Analizando estructura de ${root} ...`));
+  console.log(chalk.gray(t("init.inspect", {p0: root})));
 
   const result = initProject(root, force);
 
   if (result.status === 'exists') {
-    console.error(chalk.red(`\n  ✖ Ya existe ${result.configPath}`));
-    console.error(chalk.gray('    Usa --force para sobrescribirlo.'));
+    console.error(chalk.red(t("init.exists", {p0: result.configPath})));
+    console.error(chalk.gray(t("init.forceHint", {})));
     return 1;
   }
 
@@ -180,16 +181,16 @@ export function runInit(root: string, force = false): number {
   const lowCoverage = coverage.totalFiles > 0 && coverage.percent < 80;
 
   if (result.status === 'created-example') {
-    console.log(chalk.yellow('\n  ⚠ No se detectaron capas típicas bajo src/'));
-    console.log(chalk.gray('    Se generó un config de EJEMPLO. Ajusta:'));
-    console.log(chalk.gray('    · "patterns" de cada capa a las carpetas reales de tu proyecto'));
-    console.log(chalk.gray('    · "allowedDependencies" según tu dirección de dependencias'));
-    console.log(chalk.gray('    · "dataAccessModules" a los clientes de red/datos que uses'));
+    console.log(chalk.yellow(t("init.noLayers", {})));
+    console.log(chalk.gray(t("init.example", {})));
+    console.log(chalk.gray(t("init.patterns", {})));
+    console.log(chalk.gray(t("init.allowed", {})));
+    console.log(chalk.gray(t("init.modules", {})));
   } else {
     console.log(
       lowCoverage
-        ? chalk.yellow('\n  ⚠ Detección parcial de capas:')
-        : chalk.green('\n  ✔ Capas detectadas:')
+        ? chalk.yellow(t("init.partial", {}))
+        : chalk.green(t("init.detected", {}))
     );
     for (const layer of result.detected) {
       console.log(`    ${layer.name.padEnd(16)} ${chalk.gray('← src/' + layer.folders.join(', src/'))}`);
@@ -198,20 +199,20 @@ export function runInit(root: string, force = false): number {
 
   if (coverage.totalFiles > 0) {
     const coverageText =
-      `${coverage.classifiedFiles}/${coverage.totalFiles} archivos (${coverage.percent}%)`;
+      t("init.coverage", {p0: coverage.classifiedFiles, p1: coverage.totalFiles, p2: coverage.percent});
     if (lowCoverage) {
-      console.log(chalk.yellow(`\n  ⚠ El config generado solo cubre ${coverageText}.`));
-      console.log(chalk.gray('    Ajusta los patterns antes de confiar en el resultado del scan.'));
-      for (const file of coverage.unclassifiedExamples) console.log(chalk.gray(`    Sin capa: ${file}`));
+      console.log(chalk.yellow(t("init.low", {p0: coverageText})));
+      console.log(chalk.gray(t("init.adjust", {})));
+      for (const file of coverage.unclassifiedExamples) console.log(chalk.gray(t("init.unclassified", {p0: file})));
     } else {
-      console.log(chalk.green(`\n  ✔ Cobertura inicial del config: ${coverageText}`));
+      console.log(chalk.green(t("init.initial", {p0: coverageText})));
     }
   }
 
-  console.log(chalk.bold(`\n  Config generado en ${result.configPath}`));
-  console.log(chalk.gray('  Sección "rules": cada regla acepta "error" (falla --ci),'));
-  console.log(chalk.gray('  "warning" (se reporta en amarillo, no falla) u "off" (no corre).'));
-  console.log(chalk.gray(`  Pruébalo con: autopsia scan ${root}`));
+  console.log(chalk.bold(t("init.saved", {p0: result.configPath})));
+  console.log(chalk.gray(t("init.rules", {})));
+  console.log(chalk.gray(t("init.levels", {})));
+  console.log(chalk.gray(t("init.try", {p0: root})));
   console.log('');
   return 0;
 }

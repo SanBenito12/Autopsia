@@ -1,15 +1,16 @@
+import { t, present } from "./i18n";
 import chalk from 'chalk';
 import * as fs from 'fs';
 import { AnalysisIssue, AnalysisIssueKind, ScanResult, Violation } from './types';
 
-const ISSUE_LABELS: Record<AnalysisIssueKind, string> = {
-  'empty-project': 'Sin archivos analizables',
-  'unanalyzable-import': 'Dependencias no analizables',
-  'unclassified-file': 'Archivos sin capa',
-  'unresolved-import': 'Imports internos sin resolver',
-  'ambiguous-layer': 'Archivos con capa ambigua',
-  'invalid-config': 'Errores de configuración',
-};
+const issueLabels = (): Record<AnalysisIssueKind, string> => ({
+  'empty-project': t("report.empty", {}),
+  'unanalyzable-import': t("report.unanalyzable", {}),
+  'unclassified-file': t("report.unclassified", {}),
+  'unresolved-import': t("report.unresolved", {}),
+  'ambiguous-layer': t("report.ambiguous", {}),
+  'invalid-config': t("report.config", {}),
+});
 
 export function analysisCoveragePercent(result: ScanResult): number {
   if (result.totalFiles === 0) return 0;
@@ -32,12 +33,12 @@ function printIssueGroups(issues: AnalysisIssue[]): void {
   for (const kind of order) {
     const group = issues.filter((issue) => issue.kind === kind);
     if (group.length === 0) continue;
-    console.log(chalk.bold(`    ${ISSUE_LABELS[kind]} — ${group.length}`));
+    console.log(chalk.bold(`    ${issueLabels()[kind]} — ${group.length}`));
     for (const issue of group.slice(0, 5)) {
       const location = issue.file ? `${issue.file}${issue.line ? `:${issue.line}` : ''}` : '';
-      console.log(`      ${location ? chalk.cyan(location) + ' · ' : ''}${issue.message}`);
+      console.log(`      ${location ? chalk.cyan(location) + ' · ' : ''}${present(issue).message}`);
     }
-    if (group.length > 5) console.log(chalk.gray(`      … y ${group.length - 5} más`));
+    if (group.length > 5) console.log(chalk.gray(t("report.more", {p0: group.length - 5})));
   }
 }
 
@@ -63,49 +64,49 @@ function healthColor(pct: number): (s: string) => string {
 
 export function printReport(result: ScanResult): void {
   console.log('');
-  console.log(chalk.bold('  🔬 AUTOPSIA — Reporte de arquitectura'));
-  console.log(chalk.gray(`  ${result.root} · ${result.totalFiles} archivos analizados`));
+  console.log(chalk.bold(t("report.title", {})));
+  console.log(chalk.gray(t("report.analyzed", {p0: result.root, p1: result.totalFiles})));
   console.log('');
 
   // La salud solo describe archivos que sí pertenecen a una capa.
-  console.log(chalk.bold('  Salud de archivos evaluados'));
+  console.log(chalk.bold(t("report.health", {})));
   for (const [layer, pct] of Object.entries(result.healthByLayer)) {
     const count = result.filesByLayer[layer] ?? 0;
     if (count === 0) {
-      console.log(`  ${layer.padEnd(16)} ${chalk.gray('──────────────────── N/A (0 archivos)')}`);
+      console.log(`  ${layer.padEnd(16)} ${chalk.gray(t("report.na", {}))}`);
       continue;
     }
     const bar = '█'.repeat(Math.round(pct / 5)).padEnd(20, '░');
     console.log(
-      `  ${layer.padEnd(16)} ${healthColor(pct)(bar)} ${healthColor(pct)(pct + '%')} ${chalk.gray(`(${count} archivos)`)}`
+      `  ${layer.padEnd(16)} ${healthColor(pct)(bar)} ${healthColor(pct)(pct + '%')} ${chalk.gray(t("report.files", {p0: count}))}`
     );
   }
 
   const unclassified = result.graph.filter((n) => n.layer === null).length;
   if (unclassified > 0) {
-    console.log(chalk.gray(`  ${unclassified} archivos sin capa asignada (no evaluados)`));
+    console.log(chalk.gray(t("report.unassigned", {p0: unclassified})));
   }
   console.log('');
 
   if (result.analysis) {
     const analysis = result.analysis;
     const coveragePct = analysisCoveragePercent(result);
-    console.log(chalk.bold('  Cobertura del análisis'));
+    console.log(chalk.bold(t("report.coverageTitle", {})));
     console.log(
-      `  Cobertura arquitectónica    ${formatPercent(coveragePct).padStart(5)}% ` +
-      `(${analysis.classifiedFiles} / ${result.totalFiles} archivos)`
+      t("report.coverage", {p0: formatPercent(coveragePct).padStart(5)}) +
+      t("report.fraction", {p0: analysis.classifiedFiles, p1: result.totalFiles})
     );
     console.log(
-      `  Dependencias internas       ${String(analysis.resolvedInternalDependencies).padStart(5)} resueltas · ` +
-      `${analysis.unresolvedInternalDependencies} sin resolver`
+      t("report.internal", {p0: String(analysis.resolvedInternalDependencies).padStart(5)}) +
+      t("report.unresolvedCount", {p0: analysis.unresolvedInternalDependencies})
     );
     if (analysis.complete) {
-      console.log(chalk.green.bold('  ✔ ANÁLISIS COMPLETO — no quedaron fronteras sin comprobar'));
+      console.log(chalk.green.bold(t("report.complete", {})));
     } else {
-      const status = result.totalFiles === 0 ? 'SIN ARCHIVOS ANALIZABLES'
-        : coveragePct < 50 ? 'CONFIGURACIÓN INSUFICIENTE' : 'ANÁLISIS INCOMPLETO';
+      const status = result.totalFiles === 0 ? t("report.emptyStatus", {})
+        : coveragePct < 50 ? t("report.insufficient", {}) : t("report.incomplete", {});
       const color = coveragePct < 50 ? chalk.red.bold : chalk.yellow.bold;
-      console.log(color(`  ⚠ ${status} — ${analysis.issues.length} problema(s)`));
+      console.log(color(t("report.issues", {p0: status, p1: analysis.issues.length})));
       printIssueGroups(analysis.issues);
     }
     console.log('');
@@ -114,7 +115,7 @@ export function printReport(result: ScanResult): void {
   const tolerated = result.tolerated ?? [];
   const suppressedNote = (): void => {
     if (result.suppressedCount) {
-      console.log(chalk.gray(`  ${result.suppressedCount} suprimida(s) con comentarios autopsia-ignore`));
+      console.log(chalk.gray(t("report.suppressed", {p0: result.suppressedCount})));
     }
   };
 
@@ -123,8 +124,8 @@ export function printReport(result: ScanResult): void {
     const verified = result.analysis?.complete !== false;
     console.log(
       verified
-        ? chalk.green.bold('  ✔ Sin violaciones. Arquitectura verificada.')
-        : chalk.yellow.bold('  ⚠ Sin violaciones detectadas, pero el análisis está incompleto.')
+        ? chalk.green.bold(t("report.clean", {}))
+        : chalk.yellow.bold(t("report.cleanIncomplete", {}))
     );
     suppressedNote();
     console.log('');
@@ -140,11 +141,11 @@ export function printReport(result: ScanResult): void {
     // Las reglas configuradas como "warning" se reportan en amarillo y no fallan --ci
     const isWarning = violations.every((v) => v.severity === 'warning');
     const header = isWarning ? chalk.bold.yellow(`  ⚠ ${rule}`) : chalk.bold.red(`  ✖ ${rule}`);
-    console.log(header + chalk.gray(` — ${violations.length} violación(es)`));
+    console.log(header + chalk.gray(t("report.violations", {p0: violations.length})));
     for (const v of violations) {
       console.log(`    ${chalk.cyan(v.file + (v.line ? `:${v.line}` : ''))}`);
-      console.log(`      ${v.message}`);
-      if (v.detail) console.log(chalk.gray(`      ↳ ${v.detail}`));
+      console.log(`      ${present(v).message}`);
+      if (v.detail) console.log(chalk.gray(`      ↳ ${present(v).detail}`));
     }
     console.log('');
   }
@@ -152,7 +153,7 @@ export function printReport(result: ScanResult): void {
   // Toleradas por el baseline: en gris, no cuentan para --ci
   if (tolerated.length > 0) {
     console.log(
-      chalk.gray(`  ⊘ toleradas (baseline) — ${tolerated.length} violación(es) ya registradas`)
+      chalk.gray(t("report.tolerated", {p0: tolerated.length}))
     );
     for (const v of tolerated) {
       console.log(chalk.gray(`    ${v.file} · ${v.rule}`));
@@ -167,7 +168,7 @@ export function printReport(result: ScanResult): void {
   }
   const top = [...countByFile.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
   if (top.length > 1) {
-    console.log(chalk.bold('  Top archivos problemáticos'));
+    console.log(chalk.bold(t("report.top", {})));
     for (const [file, count] of top) {
       console.log(`    ${chalk.red(String(count).padStart(2))}  ${file}`);
     }
@@ -177,12 +178,12 @@ export function printReport(result: ScanResult): void {
   if (result.tolerated) {
     const freshLabel =
       result.violations.length > 0
-        ? chalk.red(`${result.violations.length} nuevas`)
-        : chalk.green('0 nuevas');
-    console.log(chalk.bold(`  Total: ${freshLabel} · ${chalk.gray(`${tolerated.length} toleradas (baseline)`)}`));
+        ? chalk.red(t("report.new", {p0: result.violations.length}))
+        : chalk.green(t("report.zero", {}));
+    console.log(chalk.bold(`  Total: ${freshLabel} · ${chalk.gray(t("report.toleratedCount", {p0: tolerated.length}))}`));
   } else {
     console.log(
-      chalk.bold(`  Total: ${chalk.red(result.violations.length + ' violaciones')} en ${countByFile.size} archivos`)
+      chalk.bold(t("report.total", {p0: chalk.red(result.violations.length + t("report.violationSuffix", {})), p1: countByFile.size}))
     );
   }
   suppressedNote();
@@ -191,6 +192,6 @@ export function printReport(result: ScanResult): void {
 
 export function writeJson(result: ScanResult, outPath: string): void {
   fs.writeFileSync(outPath, JSON.stringify(result, null, 2), 'utf-8');
-  console.log(chalk.gray(`  Reporte JSON guardado en ${outPath}`));
+  console.log(chalk.gray(t("report.json", {p0: outPath})));
   console.log('');
 }

@@ -2,156 +2,69 @@
 
 [![CI](https://github.com/SanBenito12/Autopsia/actions/workflows/ci.yml/badge.svg)](https://github.com/SanBenito12/Autopsia/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/autopsia-rn)](https://www.npmjs.com/package/autopsia-rn)
-![license](https://img.shields.io/badge/license-MIT-green)
 
-**🇺🇸 [Read in English](README.md)**
+[English](README.md) · Español
 
-CLI que audita tu proyecto **React Native / TypeScript** contra las reglas de **Clean Architecture** — encuentra los imports que rompen tus capas, en segundos.
+**Evita nuevas violaciones arquitectónicas en tu app React Native sin arreglar toda la deuda heredada primero.**
 
-![Demo](docs/demo.png)
+Autopsia comprueba dependencias TypeScript contra reglas de capas configuradas. Registra la deuda actual como baseline, bloquea errores nuevos en CI y explora un grafo sin conexión.
 
-## ¿Por qué?
+[Demo interactiva](https://sanbenito12.github.io/Autopsia/report.es.html) · [Guía inicial](https://github.com/SanBenito12/Autopsia/blob/main/docs/getting-started.es.md)
 
-Alguien mete una pantalla que llama `axios.get()` directo. Funciona, y todos siguen con su vida. Seis meses después no puedes testear esa pantalla sin mockear la red, y cuando la API cambia terminas cazando el cambio en 40 archivos de UI en vez de en un repositorio. Autopsia atrapa ese import el día que aparece — como ESLint, pero para tu arquitectura en vez de tu sintaxis.
+## Primer reporte
 
-*¿Clean Architecture te suena vagamente? Hay una [explicación de 10 líneas con diagrama](docs/getting-started.md#what-is-clean-architecture) en la guía — la versión corta: la UI no debería hablar con la red directamente, y tu lógica de negocio no debería saber que React existe.*
-
-## Quick Start
-
-Tres comandos, sin instalar nada:
+Requiere Node 18+. Desde la raíz de tu proyecto:
 
 ```bash
-npx autopsia-rn init          # 1. detecta tus capas y genera autopsia.config.json
-npx autopsia-rn scan .        # 2. audita el proyecto
-npx autopsia-rn scan . --html --open   # 3. abre el grafo interactivo de dependencias
+npx autopsia-rn@0.5.0 init --lang es
+npx autopsia-rn@0.5.0 scan . --lang es --html --open
 ```
 
-Lo que vas a ver:
+Revisa la configuración y cobertura. `init` detecta nombres comunes bajo `src/` y `src/features/*/`; otras estructuras requieren patrones manuales.
 
-```
-  🔬 AUTOPSIA — Reporte de arquitectura
-  . · 8 archivos analizados
-
-  Salud por capa
-  presentation     ██████████░░░░░░░░░░ 50% (4 archivos)
-  domain           ██████████░░░░░░░░░░ 50% (2 archivos)
-
-  ✖ direct-data-access — 1 violación(es)
-    src/presentation/screens/HomeScreen.tsx
-      Acceso directo a datos/red ("axios") en capa "presentation"
-      ↳ Debe pasar por un repositorio o caso de uso
-
-  Total: 5 violaciones en 3 archivos
-```
-
-Si `init` no reconoce tu estructura de carpetas, genera un config de ejemplo — ajustarlo toma un minuto con la [guía de configuración](docs/configuration.md).
-
-## ¿Ya tienes un proyecto con violaciones? (todos los tienen)
-
-No tienes que arreglar 25 violaciones antes de adoptar la herramienta. Registra lo que existe hoy como **baseline**; a partir de ahí solo fallan las violaciones **nuevas**:
+## Adopta con deuda existente
 
 ```bash
-npx autopsia-rn scan . --update-baseline   # tolera todo lo que existe hoy
-npx autopsia-rn scan . --ci                # ✅ pasa — solo fallará con violaciones NUEVAS
+npx autopsia-rn@0.5.0 scan . --lang es --update-baseline
+npx autopsia-rn@0.5.0 scan . --lang es --ci
 ```
 
-Commitea `autopsia-baseline.json` y tu deuda legacy deja de gritarte mientras la pagas. Detalles en la [guía de inicio](docs/getting-started.md#adopting-autopsia-in-a-legacy-project).
+Commitea `autopsia.config.json` y `autopsia-baseline.json`. Los errores nuevos fallan CI; con `strict: true`, el análisis incompleto también falla. La deuda tolerada sigue visible. Nunca regeneres el baseline automáticamente en CI.
 
-## Verificación estricta
+Para medir una refactorización, guarda un JSON con `-o before.json` y después ejecuta `scan . --compare before.json --lang es`. La comparación incluye deuda tolerada y no cambia los criterios de CI.
 
-Los configs nuevos incluyen `"strict": true`. En este modo Autopsia no declara sana una arquitectura si quedó algo sin comprobar:
+## Reglas y alcance
 
-- todos los archivos TypeScript deben pertenecer exactamente a una capa;
-- todos los imports internos deben resolverse;
-- los patterns de capas no pueden ser ambiguos;
-- las capas y reglas mencionadas en el config deben existir.
-
-El scanner reconoce `import`, reexports (`export ... from`), `require()` e `import()` dinámico, y muestra la línea exacta de cada violación. En CI, un análisis incompleto falla aunque no se haya encontrado una violación:
-
-```text
-Cobertura del análisis
-Archivos clasificados         438 / 438
-Dependencias internas        1284 resueltas · 0 sin resolver
-✔ Análisis completo: no quedaron fronteras sin comprobar
-```
-
-Esto certifica el **cumplimiento de todas las reglas arquitectónicas configuradas**; ESLint y TypeScript siguen ocupándose de sintaxis, tipos y estilo.
-
-La cobertura se muestra como porcentaje. Autopsia separa archivos sin capa, imports sin resolver y patrones ambiguos; una configuración que cubre menos del 50% se identifica como `CONFIGURACIÓN INSUFICIENTE`. Las capas vacías muestran `N/A`, nunca un falso `100%`.
-
-## Grafo interactivo
-
-`--html --open` genera un visor autocontenido: grafo force-directed de dependencias, un color por capa, aristas rojas para los imports que violan reglas.
-
-🔗 **[Demo en vivo](https://sanbenito12.github.io/Autopsia/report.html)** · [sitio de docs](https://sanbenito12.github.io/Autopsia/)
-
-## Reglas
-
-| Regla | Qué detecta |
+| Regla | Detecta |
 |---|---|
-| [`dependency-direction`](docs/rules.md#dependency-direction) | Una capa importando de una capa prohibida (ej. `domain → data`) |
-| [`direct-data-access`](docs/rules.md#direct-data-access) | Pantallas/UI llamando axios, Supabase, AsyncStorage directamente |
-| [`forbidden-external`](docs/rules.md#forbidden-external) | Domain contaminado con React, react-native, axios, … |
-| [`circular-deps`](docs/rules.md#circular-deps) | Ciclos de imports (A → B → A), directos o transitivos |
+| `dependency-direction` | Dependencias entre capas no permitidas |
+| `direct-data-access` | Imports de clientes de datos configurados desde capas restringidas |
+| `forbidden-external` | Paquetes externos prohibidos en una capa |
+| `circular-deps` | Ciclos de imports |
 
-Cada regla se puede poner en `"error"`, `"warning"` u `"off"` por proyecto, y cualquier violación puntual se puede suprimir con un comentario documentado `// autopsia-ignore-next-line`. La [guía de reglas](docs/rules.md) muestra el código malo, el fix y por qué importa — para cada regla.
+Cada regla acepta `error`, `warning` u `off`; las excepciones locales usan comentarios `autopsia-ignore`.
 
-## CI
+Autopsia verifica dependencias según tu configuración; no certifica la calidad completa de la arquitectura. Los imports exclusivamente de tipos se excluyen de las reglas. Las llamadas globales a `fetch()` no se detectan. Los archivos ignorados quedan fuera de la cobertura.
 
-Romper el build solo con violaciones nuevas:
+## Idiomas y compatibilidad
 
-```yaml
-steps:
-  - uses: actions/checkout@v4
-  - uses: actions/setup-node@v4
-    with: { node-version: 20 }
-  - run: npx autopsia-rn scan . --ci
-```
+0.5 usa inglés por defecto. `--lang es` cambia terminal y HTML y funciona antes o después del subcomando. El JSON conserva `message` y `detail` canónicos en español y añade metadatos opcionales `diagnostic`. Los baselines v1 de 0.4 siguen funcionando; los reportes antiguos sin metadatos muestran su texto original.
 
-Receta completa (con baseline): [docs/ci.md](docs/ci.md).
+## Evidencia reproducible
 
-## Probado en una app real en producción
+El fixture público contiene ocho archivos y cinco violaciones intencionales. El [ejemplo antes/después](https://github.com/SanBenito12/Autopsia/blob/main/docs/before-after.md) rompe un ciclo: **5 → 4 violaciones, 1 resuelta, 0 nuevas**.
 
-Escaneé una app React Native en producción (~130 archivos): **25 violaciones en menos de 2 segundos, cero falsos positivos**. 3 archivos concentraban ~50% de las violaciones — el reporte funciona como plan de refactor priorizado.
-
-![Reporte real](docs/case-study.png)
+El mantenedor reportó anteriormente 25 hallazgos en menos de dos segundos sobre una app de producción de unos 130 archivos, sin falsos positivos identificados en esa revisión. Es un caso reportado, no una garantía general de precisión o rendimiento. La demo pública usa únicamente fixtures del repositorio.
 
 ## Documentación
 
-- 📖 [Getting started](docs/getting-started.md) — paso a paso con salida real, más una intro exprés a Clean Architecture
-- 📏 [Reglas](docs/rules.md) — ejemplo malo, ejemplo bueno y cómo ignorar cada regla con razón legítima
-- ⚙️ [Configuración](docs/configuration.md) — cada campo de `autopsia.config.json`
-- 🤖 [CI](docs/ci.md) — receta de GitHub Actions con baseline
+- [Primeros pasos](https://github.com/SanBenito12/Autopsia/blob/main/docs/getting-started.es.md)
+- [Configuración](https://github.com/SanBenito12/Autopsia/blob/main/docs/configuration.es.md)
+- [Reglas y ejemplos](https://github.com/SanBenito12/Autopsia/blob/main/docs/rules.es.md)
+- [CI](https://github.com/SanBenito12/Autopsia/blob/main/docs/ci.es.md)
 
-## Comparar cambios de arquitectura
+[eslint-plugin-boundaries](https://github.com/javierbrea/eslint-plugin-boundaries) y [dependency-cruiser](https://github.com/sverweij/dependency-cruiser) también comprueban dependencias arquitectónicas. Autopsia reúne detección de capas, baseline, cobertura estricta y reporte visual para un flujo de adopción en React Native / TypeScript.
 
-```bash
-npx autopsia-rn scan . -o antes.json
-# Después de refactorizar:
-npx autopsia-rn scan . --compare antes.json -o despues.json
-```
+Cuéntanos cuánto tardaste en obtener un reporte útil y qué hallazgos no te parecen correctos mediante un [issue](https://github.com/SanBenito12/Autopsia/issues).
 
-Muestra violaciones nuevas, resueltas y persistentes, además del cambio de cobertura de archivos clasificados. Incluye la deuda tolerada por el baseline y cuenta ocurrencias repetidas; mover líneas no crea deuda nueva. El JSON incorpora `comparison`. La comparación es informativa: no modifica `--ci` ni actualiza el baseline. Compara el mismo proyecto y configuración; cambiar reglas o patrones también cambia el resultado. La cobertura ausente en reportes antiguos aparece como `N/A`.
-
-En v0.4, `init` detecta capas dentro de `src/features/*/` y muestra ejemplos de archivos sin clasificar cuando la cobertura es baja. El modo estricto rechaza scans vacíos y argumentos calculados de `import()`/`require()` que no pueden analizarse estáticamente. Admite strings literales y templates sin interpolación. Los baselines de versión 1 siguen siendo compatibles; una ocurrencia adicional del mismo problema ahora cuenta como nueva.
-
-El visor HTML incluye D3 y los datos del reporte: funciona sin conexión y sin CDN.
-
-## Roadmap
-
-- [x] Visor interactivo del grafo (`--html --open`)
-- [x] Path aliases del tsconfig (`@/*`) resueltos en el grafo
-- [x] `autopsia init` — generador de config detectando tu estructura
-- [x] Baseline para proyectos legacy (`--update-baseline`)
-- [x] Comentarios de escape `autopsia-ignore`
-- [x] Severidad por regla (`error` / `warning` / `off`)
-- [x] Comparación histórica (`--compare reporte-anterior.json`)
-- [ ] Reglas extra: god files, lógica de negocio en componentes, archivos huérfanos
-
-## Stack
-
-Node · TypeScript · ts-morph (AST) · commander · chalk
-
-## Licencia
-
-MIT
+MIT © Salvador Castillo.

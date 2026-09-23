@@ -1,3 +1,4 @@
+import type { Diagnostic } from './i18n';
 export interface LayerConfig {
   /** Nombre de la capa, p. ej. "presentation" */
   name: string;
@@ -89,6 +90,7 @@ export type AnalysisIssueKind =
   | 'unresolved-import';
 
 export interface AnalysisIssue {
+  diagnostic?: Diagnostic;
   kind: AnalysisIssueKind;
   message: string;
   file?: string;
@@ -113,6 +115,7 @@ export interface AnalysisCoverage {
 export type Severity = 'error' | 'warning';
 
 export interface Violation {
+  diagnostic?: Diagnostic;
   rule: string;
   severity: Severity;
   file: string;

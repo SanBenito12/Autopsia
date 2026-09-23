@@ -1,3 +1,4 @@
+import { format } from "../i18n";
 import { FileNode, Violation } from '../types';
 import { dependencySuppressed, isSuppressed } from '../ignores';
 
@@ -67,12 +68,12 @@ export function checkCircularDeps(nodes: FileNode[]): Violation[] {
     const evidence = firstNode?.dependencies?.find(
       (dependency) => dependency.resolvedPath === cycle[1] && !dependency.typeOnly
     );
-    const violation: Violation = {
+    const violation: Violation = { diagnostic: { message: { code: "rule.cycle", params: {p0: cycle.length - 1} } },
       rule: 'circular-deps',
       severity: 'error',
       file: cycle[0],
       line: evidence?.line,
-      message: `Dependencia circular detectada (${cycle.length - 1} archivos)`,
+      message: format("rule.cycle", {p0: cycle.length - 1}, "es"),
       detail: cycle.join(' → '),
     };
     if (cycleSuppressed(cycle)) violation.suppressed = true;

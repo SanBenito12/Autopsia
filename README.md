@@ -2,154 +2,104 @@
 
 [![CI](https://github.com/SanBenito12/Autopsia/actions/workflows/ci.yml/badge.svg)](https://github.com/SanBenito12/Autopsia/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/autopsia-rn)](https://www.npmjs.com/package/autopsia-rn)
-![license](https://img.shields.io/badge/license-MIT-green)
+[![MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-**🇪🇸 [Leer en español](README.es.md)**
+English · [Español](README.es.md)
 
-A CLI that audits your **React Native / TypeScript** project against **Clean Architecture** rules — it finds the imports that break your layers, in seconds.
+**Stop new architecture violations in your React Native app—without fixing all your legacy debt first.**
 
-![Demo](docs/demo.png)
+Autopsia checks your TypeScript dependencies against configured layer rules. Record today's debt as a baseline, block new errors in CI, and explore an offline dependency graph.
 
-## Why?
+[Try the interactive demo](https://sanbenito12.github.io/Autopsia/report.html) · [Get started](https://github.com/SanBenito12/Autopsia/blob/main/docs/getting-started.md) · [Website](https://sanbenito12.github.io/Autopsia/)
 
-Somebody ships a screen that calls `axios.get()` directly. It works, everyone moves on. Six months later you can't write a test for that screen without mocking the network, and when the API changes you're hunting through 40 UI files instead of one repository. Autopsia catches that import the day it appears — like ESLint, but for your architecture instead of your syntax.
+![Actual CLI output from the public sample fixture](https://raw.githubusercontent.com/SanBenito12/Autopsia/main/docs/demo.png)
 
-*New to Clean Architecture? There's a [10-line explanation with a diagram](docs/getting-started.md#what-is-clean-architecture) in the guide — the short version: UI code shouldn't talk to the network directly, and your business logic shouldn't know React exists.*
+## Get a useful report
 
-## Quick Start
-
-Three commands, no install:
+Requires Node 18+. Run from your project root:
 
 ```bash
-npx autopsia-rn init          # 1. detects your layers, writes autopsia.config.json
-npx autopsia-rn scan .        # 2. audits the project
-npx autopsia-rn scan . --html --open   # 3. opens the interactive dependency graph
+npx autopsia-rn@0.5.0 init
+npx autopsia-rn@0.5.0 scan . --html --open
 ```
 
-What you'll see:
+Review the generated configuration and coverage first. `init` detects common layer names under `src/` and `src/features/*/`; other structures need manual patterns. If files are unclassified, adjust your config before relying on the report.
 
-```
-  🔬 AUTOPSIA — Architecture report
-  . · 8 files analyzed
-
-  Salud por capa
-  presentation     ██████████░░░░░░░░░░ 50% (4 archivos)
-  domain           ██████████░░░░░░░░░░ 50% (2 archivos)
-
-  ✖ direct-data-access — 1 violación(es)
-    src/presentation/screens/HomeScreen.tsx
-      Acceso directo a datos/red ("axios") en capa "presentation"
-      ↳ Debe pasar por un repositorio o caso de uso
-
-  Total: 5 violaciones en 3 archivos
-```
-
-If `init` doesn't recognize your folder structure, it writes an example config — adjusting it takes a minute with the [configuration guide](docs/configuration.md).
-
-## Already have violations? (every real project does)
-
-You don't have to fix 25 violations before adopting the tool. Record what exists today as a **baseline**; from then on only **new** violations fail:
+## Adopt without fixing everything today
 
 ```bash
-npx autopsia-rn scan . --update-baseline   # tolerates everything that exists today
-npx autopsia-rn scan . --ci                # ✅ passes — will only fail on NEW violations
+npx autopsia-rn@0.5.0 scan . --update-baseline
+npx autopsia-rn@0.5.0 scan . --ci
 ```
 
-Commit `autopsia-baseline.json` and your legacy debt stops screaming at you while you pay it down. Details in the [getting started guide](docs/getting-started.md#adopting-autopsia-in-a-legacy-project).
+Commit `autopsia.config.json` and `autopsia-baseline.json`. Existing debt stays visible; **new error-level violations fail CI**. In strict mode, incomplete analysis also fails. Never regenerate the baseline automatically in CI.
 
-## Strict verification
-
-New configs include `"strict": true`. In strict mode Autopsia never calls an architecture healthy when something was left unchecked:
-
-- every TypeScript file must belong to exactly one layer;
-- every internal dependency must resolve;
-- layer patterns cannot be ambiguous;
-- every layer and rule referenced by the config must exist.
-
-The scanner follows `import`, re-exports (`export ... from`), `require()`, and dynamic `import()`, and reports exact source lines. In CI, incomplete analysis fails even when no violation was found:
-
-```text
-Analysis coverage
-Classified files              438 / 438
-Internal dependencies        1284 resolved · 0 unresolved
-✔ Complete analysis: no architectural boundary was left unchecked
-```
-
-This certifies **compliance with every configured architecture rule**. ESLint and TypeScript remain responsible for syntax, types, and style.
-
-Coverage is shown as a percentage. Autopsia separates unclassified files, unresolved imports, and ambiguous patterns; a configuration covering less than 50% is labeled `INSUFFICIENT CONFIGURATION`. Empty layers display `N/A`, never a misleading `100%`.
-
-## Compare architecture changes
+After a refactor, compare your progress:
 
 ```bash
-npx autopsia-rn scan . -o before.json
-# Refactor your project, then:
-npx autopsia-rn scan . --compare before.json -o after.json
+npx autopsia-rn@0.5.0 scan . -o before.json
+# Refactor, then:
+npx autopsia-rn@0.5.0 scan . --compare before.json
 ```
 
-Shows new, resolved, and persistent violations, plus the change in classified-file coverage. Comparison includes baseline-tolerated debt and counts repeated occurrences; moving lines does not create new debt. JSON output includes a `comparison` field. `--compare` is informational and does not change `--ci` or update the baseline. Compare reports from the same project and configuration; rule/config changes also affect the result. Reports without coverage metadata show `N/A`.
+See new, resolved and persistent violations, including tolerated debt. Comparison is informational; baseline and CI rules still decide whether a build passes.
 
-In v0.4, `init` also detects layers inside `src/features/*/` and lists examples of unclassified files when coverage is low. Strict CI rejects empty scans and computed `import()`/`require()` arguments that cannot be analyzed statically. String literals and template literals without interpolation are supported. Existing version-1 baselines remain compatible; additional occurrences of a known violation now count as new.
+## What it checks
 
-## Interactive graph
-
-`--html --open` generates a self-contained viewer: force-directed dependency graph, one color per layer, red edges for violating imports. D3 and report data are embedded, so the report works offline without a CDN.
-
-🔗 **[Live demo](https://sanbenito12.github.io/Autopsia/report.html)** · [docs site](https://sanbenito12.github.io/Autopsia/)
-
-## Rules
-
-| Rule | What it catches |
+| Rule | Example |
 |---|---|
-| [`dependency-direction`](docs/rules.md#dependency-direction) | A layer importing from a layer it shouldn't (e.g. `domain → data`) |
-| [`direct-data-access`](docs/rules.md#direct-data-access) | Screens/UI calling axios, Supabase, AsyncStorage directly |
-| [`forbidden-external`](docs/rules.md#forbidden-external) | Domain contaminated with React, react-native, axios, … |
-| [`circular-deps`](docs/rules.md#circular-deps) | Import cycles (A → B → A), direct or transitive |
+| `dependency-direction` | Domain importing a data implementation against its allowed dependencies |
+| `direct-data-access` | UI importing configured data clients such as axios or AsyncStorage |
+| `forbidden-external` | Domain importing React or another forbidden external package |
+| `circular-deps` | An import chain returning to its starting file |
 
-Every rule can be set to `"error"`, `"warning"` or `"off"` per project, and any single violation can be suppressed with a documented `// autopsia-ignore-next-line` comment. The [rules guide](docs/rules.md) shows bad code, the fix, and why it matters — for each rule.
+Configure `error`, `warning` or `off` per rule. Document local exceptions with `// autopsia-ignore-next-line <rule> -- reason`. [Examples and fixes](https://github.com/SanBenito12/Autopsia/blob/main/docs/rules.md).
 
-## CI
+The scanner follows imports, re-exports, `require()` and dynamic `import()`, resolves tsconfig aliases, and records source lines. Strict coverage distinguishes unclassified files, ambiguous layers and unresolved dependencies. Empty layers show `N/A`.
 
-Fail the build only on new violations:
+**Scope:** Autopsia verifies configured dependency rules, not overall architectural quality. Type-only imports are excluded from dependency rules. Direct data access checks configured module imports; it does not detect global `fetch()` calls. Excluded files and disabled rules are outside the checks.
+
+## English and Spanish
+
+English is the default in 0.5. For Spanish terminal output and HTML:
+
+```bash
+npx autopsia-rn@0.5.0 scan . --lang es --html --open
+```
+
+`--lang en|es` works before or after `scan` and `init`. Existing 0.4 baselines remain compatible. JSON retains canonical Spanish `message`/`detail` fields with optional diagnostic metadata; changing presentation language never introduces new debt. Older reports without metadata display their original text.
+
+## Add it to CI
 
 ```yaml
 steps:
   - uses: actions/checkout@v4
   - uses: actions/setup-node@v4
-    with: { node-version: 20 }
-  - run: npx autopsia-rn scan . --ci
+    with: { node-version: 22 }
+  - run: npx --yes autopsia-rn@0.5.0 scan . --ci
 ```
 
-Full recipe (with baseline and PR comments): [docs/ci.md](docs/ci.md).
+Commit your config and baseline first. [Full workflow with HTML artifacts](https://github.com/SanBenito12/Autopsia/blob/main/docs/ci.md).
 
-## Tested on a real production app
+## See the result, reproduce the result
 
-Scanned a production React Native app (~130 files): **25 violations in under 2 seconds, zero false positives**. 3 files concentrated ~50% of the violations — the report doubles as a prioritized refactor plan.
+![Offline dependency graph from the public fixture](https://raw.githubusercontent.com/SanBenito12/Autopsia/main/docs/graph.png)
 
-![Real report](docs/case-study.png)
+The public fixture contains eight files and five intentional violations. [Reproduce a fix](https://github.com/SanBenito12/Autopsia/blob/main/docs/before-after.md) that removes one cycle: **5 → 4 violations, 1 resolved, 0 new**.
 
-## Documentation
+The maintainer previously reported 25 findings in under two seconds on one production React Native app of roughly 130 files, with no false positives identified in that review. This is a single reported case, not a general accuracy or performance guarantee. The public demo uses only repository fixtures.
 
-- 📖 [Getting started](docs/getting-started.md) — step by step, with real output, plus a crash intro to Clean Architecture
-- 📏 [Rules](docs/rules.md) — bad example, good example, and how to ignore each rule legitimately
-- ⚙️ [Configuration](docs/configuration.md) — every field of `autopsia.config.json`
-- 🤖 [CI](docs/ci.md) — GitHub Actions recipe with baseline
+## Where Autopsia fits
 
-## Roadmap
+[eslint-plugin-boundaries](https://github.com/javierbrea/eslint-plugin-boundaries) enforces architecture within ESLint; [dependency-cruiser](https://github.com/sverweij/dependency-cruiser) validates and visualizes dependencies. Autopsia focuses on an approachable React Native / TypeScript workflow combining layer detection, legacy baselines, strict analysis coverage and a shareable offline report. Keep ESLint and TypeScript for their own checks.
 
-- [x] Interactive graph viewer (`--html --open`)
-- [x] tsconfig path aliases (`@/*`) resolved in the graph
-- [x] `autopsia init` — config generator that detects your structure
-- [x] Baseline for legacy projects (`--update-baseline`)
-- [x] `autopsia-ignore` escape comments
-- [x] Per-rule severity (`error` / `warning` / `off`)
-- [x] Historical comparison (`--compare previous-report.json`)
-- [ ] More rules: god files, business logic in components, orphan files
+## Documentation and feedback
 
-## Stack
+- [Getting started](https://github.com/SanBenito12/Autopsia/blob/main/docs/getting-started.md)
+- [Configuration and CLI reference](https://github.com/SanBenito12/Autopsia/blob/main/docs/configuration.md)
+- [Rules and exceptions](https://github.com/SanBenito12/Autopsia/blob/main/docs/rules.md)
+- [CI and migration from 0.4](https://github.com/SanBenito12/Autopsia/blob/main/docs/ci.md)
 
-Node · TypeScript · ts-morph (AST) · commander · chalk
+Trying Autopsia on your app? [Open an issue](https://github.com/SanBenito12/Autopsia/issues) with your folder structure, time to first useful report and any findings you disagree with. Remove private code and secrets from examples.
 
-## License
-
-MIT
+MIT © Salvador Castillo. Built with TypeScript, ts-morph, commander and D3.
