@@ -23,7 +23,7 @@ try {
   const report = path.join(temp, 'report.html');
   const result = run(['scan', path.join(root, 'fixtures', 'sample-app'), '--ci', '--html', report]);
   assert.equal(result.status, 1, result.stderr);
-  assert.match(result.stdout, /Total: 5 violaciones/);
+  assert.match(result.stdout, /Total: 5 violations/);
   const html = fs.readFileSync(report, 'utf8');
   assert.doesNotMatch(html, /<script[^>]+src=/i);
   assert.match(html, /Permission to use, copy, modify/);

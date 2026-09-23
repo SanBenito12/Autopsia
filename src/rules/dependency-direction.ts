@@ -1,3 +1,4 @@
+import { format } from "../i18n";
 import { AutopsiaConfig, Dependency, FileNode, Violation } from '../types';
 import { dependencySuppressed, isSuppressed } from '../ignores';
 
@@ -31,13 +32,13 @@ export function checkDependencyDirection(
 
       if (!allowed.includes(targetLayer)) {
         const evidence = 'kind' in occurrence ? occurrence as Dependency : undefined;
-        const violation: Violation = {
+        const violation: Violation = { diagnostic: { message: { code: "rule.direction", params: {p0: node.layer, p1: targetLayer} }, detail: { code: "rule.import", params: {p0: imp} } },
           rule: 'dependency-direction',
           severity: 'error',
           file: node.path,
           line: evidence?.line,
-          message: `Capa "${node.layer}" no puede depender de "${targetLayer}"`,
-          detail: `importa ${imp}`,
+          message: format("rule.direction", {p0: node.layer, p1: targetLayer}, "es"),
+          detail: format("rule.import", {p0: imp}, "es"),
         };
         if (evidence ? dependencySuppressed(evidence, 'dependency-direction') : isSuppressed(node, 'dependency-direction', { internal: imp })) {
           violation.suppressed = true;

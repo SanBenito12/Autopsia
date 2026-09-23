@@ -1,266 +1,115 @@
-# Reglas
+# Rules
 
-Autopsia trae 4 reglas. Para cada una: qué detecta, un ejemplo de código que la rompe, el fix, por qué importa en una app real, y cómo ignorarla cuando hay una razón legítima.
+English · [Español](rules.es.md)
 
-Las 4 se configuran por proyecto en la sección `"rules"` del config:
-
-```json
-"rules": {
-  "dependency-direction": "error",   // falla --ci (default)
-  "direct-data-access": "error",
-  "forbidden-external": "warning",   // se reporta en amarillo, no falla
-  "circular-deps": "off"             // no corre
-}
-```
-
-Los imports `import type { … }` **no cuentan** para ninguna regla de dependencias: solo existen en tiempo de compilación y no generan acoplamiento real. Los barrels (`index.ts`) se resuelven al archivo real, así que re-exportar una violación no la "lava".
-
----
+Autopsia checks four dependency rules. Configure each as `error`, `warning` or `off`. Type-only imports are excluded from dependency rules; this is a tool boundary, not a claim that types cannot create design coupling. Re-exports form graph edges and are checked too.
 
 ## dependency-direction
 
-**Qué detecta:** una capa importando de una capa que no está en su lista `allowedDependencies`. El caso clásico: la UI saltándose el dominio para hablar directo con la capa de datos.
+Detects imports to another layer outside `allowedDependencies`.
 
-**Malo** — la pantalla importa el repositorio directamente:
-
-```tsx
-// src/presentation/screens/HomeScreen.tsx
+```ts
+// Bad: src/presentation/screens/HomeScreen.tsx
 import { EventRepository } from '../../data/repositories/EventRepository';
 
-export function HomeScreen() {
-  const repo = new EventRepository();        // presentation → data ✖
-  // ...
-}
-```
-
-**Bueno** — la pantalla habla con un caso de uso del dominio, y es el caso de uso quien recibe el repositorio:
-
-```tsx
-// src/presentation/screens/HomeScreen.tsx
+// Better: depend on a domain use case, supplied by the composition root
 import { GetEventsUseCase } from '../../domain/usecases/GetEventsUseCase';
-
-export function HomeScreen({ getEvents }: { getEvents: GetEventsUseCase }) {
-  // presentation → domain ✔
+export function loadEvents(getEvents: GetEventsUseCase) {
+  return getEvents.execute();
 }
 ```
 
-**Por qué importa:** cuando la UI conoce los repositorios, cada cambio en la capa de datos (nueva API, cambiar Supabase por otra cosa, agregar caché) obliga a tocar pantallas. Con la dirección correcta, ese cambio se queda en `data` y la UI ni se entera. También es lo que te permite testear un caso de uso con un repositorio falso en memoria.
+Keeping data implementations out of UI code reduces how many screens must change when a backend changes. Configure your composition root separately so it can wire implementations to contracts.
 
-**Cómo ignorarla legítimamente:** durante una migración por etapas puede haber imports que aún no puedes romper:
+For logging or other shared services, define a domain contract and inject its implementation. A presentation hook may consume an injected logger from React Context. A temporary direct dependency can instead use a documented exception:
 
 ```ts
-// autopsia-ignore-next-line dependency-direction -- migración a usecases en curso, ticket ARQ-12
-import { EventRepository } from '../../data/repositories/EventRepository';
+// autopsia-ignore-next-line dependency-direction -- migrating logger injection, ARQ-12
+import { logger } from '../../infrastructure/logger';
 ```
-
-### Casos frecuentes: logging y utilidades transversales
-
-Tarde o temprano una pantalla necesita el logger (o analytics, o feature flags) que vive en `infrastructure`, y esta regla lo marca. Es la duda más común al adoptar la herramienta — y tiene tres salidas válidas:
-
-**Malo** — cada pantalla importa la implementación directamente:
-
-```tsx
-// src/presentation/screens/CheckoutScreen.tsx
-import { SentryLogger } from '../../infrastructure/logging/SentryLogger';   // ✖ presentation → infrastructure
-
-export function CheckoutScreen() {
-  SentryLogger.error('pago rechazado');
-}
-```
-
-**Opción A — interfaz en el dominio + inyección.** El contrato `Logger` vive en `domain` (o `domain/shared`); `infrastructure` lo implementa y el árbol de composición lo inyecta. Es la solución canónica: ninguna capa exterior conoce a otra capa exterior.
-
-```ts
-// src/domain/shared/Logger.ts — TypeScript puro ✔
-export interface Logger {
-  error(message: string): void;
-}
-
-// src/infrastructure/logging/SentryLogger.ts
-import { Logger } from '../../domain/shared/Logger';   // infrastructure → domain ✔
-export class SentryLogger implements Logger { /* ... */ }
-```
-
-```tsx
-// src/presentation/screens/CheckoutScreen.tsx
-import { Logger } from '../../domain/shared/Logger';   // presentation → domain ✔
-
-export function CheckoutScreen({ logger }: { logger: Logger }) {
-  logger.error('pago rechazado');
-}
-```
-
-**Opción B — hook `useLogger` en presentation.** Un solo hook envuelve la implementación (recibida vía Context desde la raíz de la app) y todas las pantallas lo usan. El acoplamiento queda contenido en un archivo en vez de regado por 40:
-
-```tsx
-// src/presentation/hooks/useLogger.ts
-import { createContext, useContext } from 'react';
-import { Logger } from '../../domain/shared/Logger';   // ✔ solo el contrato
-
-export const LoggerContext = createContext<Logger | null>(null);
-export const useLogger = (): Logger => useContext(LoggerContext)!;
-
-// App.tsx (raíz de composición) provee la impl de infrastructure UNA vez
-```
-
-```tsx
-// cualquier pantalla
-const logger = useLogger();   // ✔ sin saber qué logger es
-```
-
-**Opción C — la excepción documentada.** Si el proyecto es chico y montar inyección para un logger te parece sobreingeniería hoy, un `autopsia-ignore` con razón es una decisión legítima y visible en el código:
-
-```ts
-// autopsia-ignore-next-line dependency-direction -- logger global consciente, evaluar DI si crece
-import { SentryLogger } from '../../infrastructure/logging/SentryLogger';
-```
-
-La trampa a evitar es la cuarta opción silenciosa: apagar la regla entera porque el logger la dispara. Usa la excepción puntual, no `"off"`.
-
----
 
 ## direct-data-access
 
-**Qué detecta:** archivos de las capas listadas en `noDirectDataAccessIn` (típicamente `presentation`) importando módulos de red/datos (`dataAccessModules`: axios, Supabase, AsyncStorage…).
-
-**Malo** — la pantalla hace la petición ella misma:
-
-```tsx
-// src/presentation/screens/HomeScreen.tsx
-import axios from 'axios';
-
-export function HomeScreen() {
-  useEffect(() => {
-    axios.get('/events').then((r) => setEvents(r.data));   // ✖
-  }, []);
-}
-```
-
-**Bueno** — la petición vive en un repositorio; la pantalla solo consume el resultado:
+Detects imports of `dataAccessModules` in layers listed in `noDirectDataAccessIn`.
 
 ```ts
-// src/data/repositories/EventRepository.ts
-import axios from 'axios';                                  // aquí sí ✔
+// Bad in presentation: this import is the evidence
+import axios from 'axios';
+export const load = () => axios.get('/events');
 
+// Better in data: UI receives a domain use case instead
+import axios from 'axios';
 export class EventRepository {
-  async getAll(): Promise<Event[]> {
-    const { data } = await axios.get('/events');
-    return data;
-  }
+  async getAll() { return (await axios.get('/events')).data; }
 }
 ```
 
-**Por qué importa:** este es el import que más duele a los 6 meses. Para testear esa pantalla necesitas mockear axios; cuando el backend cambia el shape de la respuesta, el cambio está regado por la UI; y agregar manejo de errores o retry consistente se vuelve imposible porque cada pantalla lo hace a su manera. Centralizado en repositorios, todo eso se arregla en un solo lugar.
+A repository provides one place for retries, response mapping and networking changes. This rule checks imports, not every data-access expression: global `fetch()` calls and unconfigured modules are not detected.
 
-**Cómo ignorarla legítimamente:** una pantalla de diagnóstico interna que hace ping a un healthcheck, por ejemplo:
+An internal diagnostic screen can document an intentional exception:
 
 ```ts
-// autopsia-ignore-next-line direct-data-access -- pantalla de debug interna, no producción
+// autopsia-ignore-next-line direct-data-access -- internal health-check screen
 import axios from 'axios';
 ```
-
----
 
 ## forbidden-external
 
-**Qué detecta:** módulos npm prohibidos en una capa, según el `forbiddenExternal` de esa capa. El uso principal: mantener `domain` como TypeScript puro, libre de `react`, `react-native`, `axios`, `@supabase`…
-
-**Malo** — un caso de uso que importa axios "solo para una cosita":
+Detects external modules listed in a layer's `forbiddenExternal` configuration.
 
 ```ts
-// src/domain/usecases/GetEventsUseCase.ts
-import axios from 'axios';                                  // ✖
+// Bad in domain
+import axios from 'axios';
 
-export class GetEventsUseCase {
-  async execute() {
-    await axios.get('/health');   // el dominio ahora depende de la red
-    // ...
-  }
-}
-```
-
-**Bueno** — el dominio define el contrato; la implementación con axios vive en `data`:
-
-```ts
-// src/domain/usecases/GetEventsUseCase.ts — TypeScript puro ✔
-export interface HealthCheck {
-  ping(): Promise<boolean>;
-}
-
-export class GetEventsUseCase {
+// Better: domain defines a contract; data supplies the implementation
+export interface HealthCheck { ping(): Promise<boolean>; }
+export class CheckHealth {
   constructor(private health: HealthCheck) {}
+  execute() { return this.health.ping(); }
 }
 ```
 
-**Por qué importa:** el dominio es la parte de tu app que debería sobrevivir a cualquier cambio de framework: son las reglas del negocio. Si importa React o axios, ya no puedes correrlo en un test de Node sin montar medio entorno, ni reusarlo (en una web, en un script) sin arrastrar dependencias móviles.
-
-**Cómo ignorarla legítimamente:** una librería puramente utilitaria que decidiste permitir en dominio mientras la envuelves:
+This helps keep domain behavior independent of frameworks and data clients. If a utility is permanently allowed, remove it from the forbidden list. For a temporary exception:
 
 ```ts
-// autopsia-ignore-next-line forbidden-external -- date-fns es puro, pendiente envolver en util propia
+// autopsia-ignore-next-line forbidden-external -- wrapping date utility in follow-up
 import { addDays } from 'date-fns';
 ```
 
-(La alternativa más limpia: quitar ese módulo del `forbiddenExternal` de la capa si la decisión es permanente.)
-
----
+The example only triggers if `date-fns` is configured as forbidden.
 
 ## circular-deps
 
-**Qué detecta:** ciclos de imports — `A → B → A`, o cadenas más largas `A → B → C → A`. Se reporta cada ciclo una sola vez.
-
-**Malo** — dos helpers que se importan mutuamente:
+Detects import cycles, including chains longer than two files.
 
 ```ts
-// helperA.ts
+// Bad: helperA.ts
 import { b } from './helperB';
 export const a = () => b() + 1;
-
 // helperB.ts
-import { a } from './helperA';   // ✖ ciclo A → B → A
+import { a } from './helperA';
 export const b = () => a() - 1;
 ```
 
-**Bueno** — lo compartido se extrae a un tercer módulo del que ambos dependen:
+Move shared behavior into a third module that neither imports its consumers nor closes another cycle. Cycles can cause initialization-order problems and make modules harder to isolate. To tolerate a known cycle temporarily, annotate one of its import edges:
 
 ```ts
-// shared.ts
-export const base = 1;
-
-// helperA.ts
-import { base } from './shared';   // ✔ A → shared ← B
-
-// helperB.ts
-import { base } from './shared';
-```
-
-**Por qué importa:** los ciclos producen los bugs más raros de diagnosticar en JavaScript: un módulo que a veces es `undefined` según el orden de carga, especialmente con Metro/React Native. También hacen imposible extraer o testear un módulo sin arrastrar al otro.
-
-**Cómo ignorarla legítimamente:** un ciclo conocido que no puedes romper todavía — marca **una** de sus aristas:
-
-```ts
-// autopsia-ignore-next-line circular-deps -- ciclo legacy models<->serializers, ticket ARQ-30
+// autopsia-ignore-next-line circular-deps -- legacy serializer cycle, ARQ-30
 import { serialize } from './serializers';
 ```
 
----
-
-<a id="ignore-comments"></a>
-## Comentarios de escape (referencia)
+## Ignore comments
 
 ```ts
-// autopsia-ignore-next-line <regla> [-- razón]   → suprime esa regla en la línea siguiente
-// autopsia-ignore-file <regla> [-- razón]        → suprime esa regla en todo el archivo (ponlo al inicio)
+// autopsia-ignore-next-line <rule> -- reason
+// autopsia-ignore-file <rule> -- reason
 ```
 
-- El nombre de regla es el de los títulos de esta página (`dependency-direction`, `direct-data-access`, `forbidden-external`, `circular-deps`).
-- **Sin nombre de regla se suprimen TODAS las reglas** en esa línea/archivo. Funciona, pero es mala práctica: nombra la regla y deja la razón tras `--` para que la excepción quede documentada y revisable.
-- Las violaciones suprimidas no se listan en el reporte; solo se muestra el conteo: `N suprimida(s) con comentarios autopsia-ignore`.
+Place file directives near the top. Omitting the rule suppresses all rules for that line or file; prefer an explicit rule and reason. Suppression applies per import occurrence, so ignoring one import does not suppress others to the same module. Suppressed violations contribute to the suppression count but are not listed.
 
-¿Cuándo usar cada mecanismo?
-
-| Situación | Herramienta |
+| Situation | Use |
 |---|---|
-| Deuda heredada masiva al adoptar la herramienta | [Baseline](getting-started.md#adopting-autopsia-in-a-legacy-project) |
-| Excepción puntual y justificada en una línea | `autopsia-ignore-next-line` con regla y razón |
-| Una regla no aplica (aún) a tu proyecto | `"rules": { "<regla>": "warning" }` u `"off"` en el [config](configuration.md) |
+| Existing debt during adoption | [Baseline](getting-started.md#adopting-autopsia-in-a-legacy-project) |
+| Intentional local exception | A named ignore comment with a reason |
+| Rule being introduced gradually | `warning` in [configuration](configuration.md) |
+| Rule does not apply | `off` in configuration |

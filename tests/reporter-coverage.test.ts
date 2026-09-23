@@ -53,10 +53,10 @@ describe('reporte de cobertura', () => {
     printReport(result());
     const text = output.join('\n');
 
-    expect(text).toContain('N/A (0 archivos)');
-    expect(text).toContain('CONFIGURACIÓN INSUFICIENTE');
-    expect(text).toContain('Archivos sin capa — 8');
-    expect(text).toContain('Imports internos sin resolver — 1');
-    expect(text).toContain('20% (2 / 10 archivos)');
+    expect(text).toContain('N/A (0 files)');
+    expect(text).toContain('INSUFFICIENT CONFIGURATION');
+    expect(text).toContain('Unclassified files — 8');
+    expect(text).toContain('Unresolved internal imports — 1');
+    expect(text).toContain('20% (2 / 10 files)');
   });
 });

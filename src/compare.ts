@@ -1,3 +1,4 @@
+import { t, present } from "./i18n";
 import * as fs from 'fs';
 import { applyBaseline, toEntry } from './baseline';
 import { ReportComparison, ScanResult, Violation } from './types';
@@ -31,18 +32,18 @@ export function loadReport(file: string): ScanResult {
     !violations(value.violations) || (value.tolerated !== undefined && !violations(value.tolerated)) ||
     (value.analysis !== undefined && (!value.analysis || !Number.isInteger(value.analysis.classifiedFiles) ||
       value.analysis.classifiedFiles < 0 || value.analysis.classifiedFiles > value.totalFiles))) {
-    throw new Error('Reporte de comparación inválido');
+    throw new Error(t("compare.invalid", {}));
   }
   return value as ScanResult;
 }
 
 export function printComparison(comparison: ReportComparison): void {
-  console.log(`  Comparación: ${comparison.added.length} nuevas · ${comparison.resolved.length} resueltas · ${comparison.persistent.length} persistentes`);
+  console.log(t("compare.summary", {p0: comparison.added.length, p1: comparison.resolved.length, p2: comparison.persistent.length}));
   const { previous, current, delta } = comparison.coverage;
   const percent = (value: number | null): string => value === null ? 'N/A' : `${value}%`;
-  console.log(`  Cobertura: ${percent(previous)} → ${percent(current)} · cambio ${delta === null ? 'N/A' : `${delta > 0 ? '+' : ''}${delta} puntos porcentuales`}`);
-  for (const [label, violations] of [['Nueva', comparison.added], ['Resuelta', comparison.resolved]] as const) {
-    for (const v of violations) console.log(`    ${label}: ${v.file}${v.line ? `:${v.line}` : ''} · ${v.rule} · ${v.message}`);
+  console.log(t("compare.coverage", {p0: percent(previous), p1: percent(current), p2: delta === null ? 'N/A' : t("compare.points", {p0: delta > 0 ? '+' : '', p1: delta})}));
+  for (const [label, violations] of [[t("compare.new", {}), comparison.added], [t("compare.resolved", {}), comparison.resolved]] as const) {
+    for (const v of violations) console.log(`    ${label}: ${v.file}${v.line ? `:${v.line}` : ''} · ${v.rule} · ${present(v).message}`);
   }
   console.log('');
 }

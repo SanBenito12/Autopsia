@@ -1,0 +1,317 @@
+{
+  "scannedAt": "2026-09-22T00:00:00.000Z",
+  "root": "fixtures/sample-app",
+  "totalFiles": 8,
+  "filesByLayer": {
+    "presentation": 4,
+    "domain": 2,
+    "data": 1,
+    "infrastructure": 1
+  },
+  "violations": [
+    {
+      "rule": "dependency-direction",
+      "severity": "error",
+      "file": "src/domain/usecases/GetEventsUseCase.ts",
+      "line": 3,
+      "message": "Capa \"domain\" no puede depender de \"data\"",
+      "detail": "importa src/data/repositories/EventRepository.ts"
+    },
+    {
+      "rule": "dependency-direction",
+      "severity": "error",
+      "file": "src/presentation/screens/HomeScreen.tsx",
+      "line": 3,
+      "message": "Capa \"presentation\" no puede depender de \"data\"",
+      "detail": "importa src/data/repositories/EventRepository.ts"
+    },
+    {
+      "rule": "direct-data-access",
+      "severity": "error",
+      "file": "src/presentation/screens/HomeScreen.tsx",
+      "line": 2,
+      "message": "Acceso directo a datos/red (\"axios\") en capa \"presentation\"",
+      "detail": "Debe pasar por un repositorio o caso de uso"
+    },
+    {
+      "rule": "forbidden-external",
+      "severity": "error",
+      "file": "src/domain/usecases/GetEventsUseCase.ts",
+      "line": 1,
+      "message": "Capa \"domain\" importa módulo prohibido \"axios\"",
+      "detail": "La capa debe mantenerse libre de \"axios\""
+    },
+    {
+      "rule": "circular-deps",
+      "severity": "error",
+      "file": "src/presentation/screens/helperA.ts",
+      "line": 1,
+      "message": "Dependencia circular detectada (2 archivos)",
+      "detail": "src/presentation/screens/helperA.ts → src/presentation/screens/helperB.ts → src/presentation/screens/helperA.ts"
+    }
+  ],
+  "graph": [
+    {
+      "path": "src/data/repositories/EventRepository.ts",
+      "layer": "data",
+      "internalImports": [
+        "src/domain/entities/Event.ts",
+        "src/infrastructure/api/client.ts"
+      ],
+      "typeOnlyImports": [],
+      "externalImports": [],
+      "dependencies": [
+        {
+          "specifier": "../../domain/entities/Event",
+          "kind": "import",
+          "line": 1,
+          "column": 23,
+          "suppressedRules": [],
+          "typeOnly": false,
+          "external": false,
+          "resolvedPath": "src/domain/entities/Event.ts",
+          "resolved": true
+        },
+        {
+          "specifier": "../../infrastructure/api/client",
+          "kind": "import",
+          "line": 2,
+          "column": 27,
+          "suppressedRules": [],
+          "typeOnly": false,
+          "external": false,
+          "resolvedPath": "src/infrastructure/api/client.ts",
+          "resolved": true
+        }
+      ]
+    },
+    {
+      "path": "src/domain/entities/Event.ts",
+      "layer": "domain",
+      "internalImports": [],
+      "typeOnlyImports": [],
+      "externalImports": [],
+      "dependencies": []
+    },
+    {
+      "path": "src/domain/usecases/GetEventsUseCase.ts",
+      "layer": "domain",
+      "internalImports": [
+        "src/domain/entities/Event.ts",
+        "src/data/repositories/EventRepository.ts"
+      ],
+      "typeOnlyImports": [],
+      "externalImports": [
+        "axios"
+      ],
+      "dependencies": [
+        {
+          "specifier": "axios",
+          "kind": "import",
+          "line": 1,
+          "column": 19,
+          "suppressedRules": [],
+          "typeOnly": false,
+          "external": true,
+          "resolved": true
+        },
+        {
+          "specifier": "../entities/Event",
+          "kind": "import",
+          "line": 2,
+          "column": 23,
+          "suppressedRules": [],
+          "typeOnly": false,
+          "external": false,
+          "resolvedPath": "src/domain/entities/Event.ts",
+          "resolved": true
+        },
+        {
+          "specifier": "../../data/repositories/EventRepository",
+          "kind": "import",
+          "line": 3,
+          "column": 33,
+          "suppressedRules": [],
+          "typeOnly": false,
+          "external": false,
+          "resolvedPath": "src/data/repositories/EventRepository.ts",
+          "resolved": true
+        }
+      ]
+    },
+    {
+      "path": "src/infrastructure/api/client.ts",
+      "layer": "infrastructure",
+      "internalImports": [],
+      "typeOnlyImports": [],
+      "externalImports": [
+        "axios"
+      ],
+      "dependencies": [
+        {
+          "specifier": "axios",
+          "kind": "import",
+          "line": 1,
+          "column": 19,
+          "suppressedRules": [],
+          "typeOnly": false,
+          "external": true,
+          "resolved": true
+        }
+      ]
+    },
+    {
+      "path": "src/presentation/screens/helperA.ts",
+      "layer": "presentation",
+      "internalImports": [
+        "src/presentation/screens/helperB.ts"
+      ],
+      "typeOnlyImports": [],
+      "externalImports": [],
+      "dependencies": [
+        {
+          "specifier": "./helperB",
+          "kind": "import",
+          "line": 1,
+          "column": 19,
+          "suppressedRules": [],
+          "typeOnly": false,
+          "external": false,
+          "resolvedPath": "src/presentation/screens/helperB.ts",
+          "resolved": true
+        }
+      ]
+    },
+    {
+      "path": "src/presentation/screens/helperB.ts",
+      "layer": "presentation",
+      "internalImports": [
+        "src/presentation/screens/helperA.ts"
+      ],
+      "typeOnlyImports": [],
+      "externalImports": [],
+      "dependencies": [
+        {
+          "specifier": "./helperA",
+          "kind": "import",
+          "line": 1,
+          "column": 19,
+          "suppressedRules": [],
+          "typeOnly": false,
+          "external": false,
+          "resolvedPath": "src/presentation/screens/helperA.ts",
+          "resolved": true
+        }
+      ]
+    },
+    {
+      "path": "src/presentation/screens/HomeScreen.tsx",
+      "layer": "presentation",
+      "internalImports": [
+        "src/data/repositories/EventRepository.ts",
+        "src/domain/entities/Event.ts"
+      ],
+      "typeOnlyImports": [],
+      "externalImports": [
+        "react",
+        "axios"
+      ],
+      "dependencies": [
+        {
+          "specifier": "react",
+          "kind": "import",
+          "line": 1,
+          "column": 19,
+          "suppressedRules": [],
+          "typeOnly": false,
+          "external": true,
+          "resolved": true
+        },
+        {
+          "specifier": "axios",
+          "kind": "import",
+          "line": 2,
+          "column": 19,
+          "suppressedRules": [],
+          "typeOnly": false,
+          "external": true,
+          "resolved": true
+        },
+        {
+          "specifier": "../../data/repositories/EventRepository",
+          "kind": "import",
+          "line": 3,
+          "column": 33,
+          "suppressedRules": [],
+          "typeOnly": false,
+          "external": false,
+          "resolvedPath": "src/data/repositories/EventRepository.ts",
+          "resolved": true
+        },
+        {
+          "specifier": "../../domain/entities/Event",
+          "kind": "import",
+          "line": 4,
+          "column": 23,
+          "suppressedRules": [],
+          "typeOnly": false,
+          "external": false,
+          "resolvedPath": "src/domain/entities/Event.ts",
+          "resolved": true
+        }
+      ]
+    },
+    {
+      "path": "src/presentation/screens/ProfileScreen.tsx",
+      "layer": "presentation",
+      "internalImports": [
+        "src/domain/entities/Event.ts"
+      ],
+      "typeOnlyImports": [],
+      "externalImports": [
+        "react"
+      ],
+      "dependencies": [
+        {
+          "specifier": "react",
+          "kind": "import",
+          "line": 1,
+          "column": 19,
+          "suppressedRules": [],
+          "typeOnly": false,
+          "external": true,
+          "resolved": true
+        },
+        {
+          "specifier": "../../domain/entities/Event",
+          "kind": "import",
+          "line": 2,
+          "column": 23,
+          "suppressedRules": [],
+          "typeOnly": false,
+          "external": false,
+          "resolvedPath": "src/domain/entities/Event.ts",
+          "resolved": true
+        }
+      ]
+    }
+  ],
+  "analysis": {
+    "classifiedFiles": 8,
+    "unclassifiedFiles": 0,
+    "totalDependencies": 14,
+    "unanalyzableDependencies": 0,
+    "resolvedInternalDependencies": 9,
+    "unresolvedInternalDependencies": 0,
+    "configErrors": 0,
+    "ambiguousFiles": 0,
+    "complete": true,
+    "issues": []
+  },
+  "healthByLayer": {
+    "presentation": 50,
+    "domain": 50,
+    "data": 100,
+    "infrastructure": 100
+  }
+}

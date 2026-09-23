@@ -1,67 +1,25 @@
-# Autopsia en CI (GitHub Actions)
+# CI with GitHub Actions
 
-La idea: cada PR corre `autopsia scan --ci`. Si alguien introduce una violación **nueva** de arquitectura, el build falla con el reporte completo en los logs. Las violaciones ya toleradas en el baseline no molestan.
+English · [Español](ci.es.md)
 
-## Receta mínima
-
-`.github/workflows/architecture.yml`:
+Commit your reviewed `autopsia.config.json` and, for a legacy project, `autopsia-baseline.json`. Add `.github/workflows/architecture.yml`:
 
 ```yaml
-name: Arquitectura
-
+name: Architecture
 on:
   pull_request:
   push:
     branches: [main]
-
 jobs:
   autopsia:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-
-      - name: Auditar arquitectura
-        run: npx autopsia-rn scan . --ci
-```
-
-Eso es todo. Requisitos: `autopsia.config.json` commiteado (lo genera `npx autopsia-rn init`) y, si tu proyecto es legacy, `autopsia-baseline.json` también commiteado.
-
-## Flujo con baseline (proyectos con deuda)
-
-1. **Una sola vez, en local:**
-
-   ```bash
-   npx autopsia-rn init
-   npx autopsia-rn scan . --update-baseline
-   git add autopsia.config.json autopsia-baseline.json
-   git commit -m "chore: adoptar autopsia con baseline"
-   ```
-
-2. **En CI** corre el workflow de arriba tal cual. `scan` encuentra el baseline en la raíz y:
-   - violaciones viejas → toleradas, exit 0 ✅
-   - violación nueva en el PR → reporte en rojo, exit 1 ❌
-
-3. **Cuando pagues deuda**, regenera el baseline en el mismo PR que arregla las violaciones:
-
-   ```bash
-   npx autopsia-rn scan . --update-baseline
-   git add autopsia-baseline.json
-   ```
-
-   Así lo arreglado ya no puede regresar. El baseline solo debería **encoger** con el tiempo — si un PR lo hace crecer, eso es una decisión de arquitectura que el review debería discutir.
-
-## Extras útiles
-
-**Subir el visor HTML como artifact del build:**
-
-```yaml
-      - name: Auditar arquitectura
-        run: npx autopsia-rn scan . --ci --html autopsia-report.html
-
+          node-version: 22
+      - name: Check architecture
+        run: npx --yes autopsia-rn@0.5.0 scan . --ci --html autopsia-report.html
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -69,28 +27,33 @@ Eso es todo. Requisitos: `autopsia.config.json` commiteado (lo genera `npx autop
           path: autopsia-report.html
 ```
 
-(`if: always()` sube el reporte también cuando el scan falla — que es justo cuando más lo quieres ver.)
+The explicit version makes updates intentional. `if: always()` preserves the report when a scan finds violations. For Spanish output, append `--lang es`. If your tsconfig extends an installed package or uses workspace resolution, install project dependencies before scanning.
 
-**Fijar la versión** para builds reproducibles:
+## Adopt with a baseline
 
-```yaml
-        run: npx autopsia-rn@0.4.0 scan . --ci
+Run locally once after reviewing configuration and coverage:
+
+```bash
+npx autopsia-rn@0.5.0 init
+npx autopsia-rn@0.5.0 scan . --update-baseline
 ```
 
-**Proyecto con path aliases** y tsconfig no estándar:
+Commit both configuration and baseline. CI should run `scan --ci`, never automatically `--update-baseline`. Existing tolerated debt does not fail CI; new error-level occurrences do. Incomplete strict analysis still fails, including an empty scan or a computed import that cannot be resolved statically.
 
-```yaml
-        run: npx autopsia-rn scan . --ci --tsconfig ./tsconfig.app.json
-```
+When fixing old debt, regenerate and review the baseline in the same PR. A growing baseline is an explicit architecture decision for reviewers.
 
-## Códigos de salida y comparación (v0.4)
+## Exit codes and comparisons
 
-- `0`: scan permitido; sin errores nuevos en CI y, si `strict` está activo, análisis completo.
-- `1`: `--ci` detecta errores nuevos o análisis incompleto con `strict: true`. Esto incluye scans vacíos e imports calculados no analizables. Los warnings solos no fallan CI.
-- `2`: configuración inválida, rutas requeridas ausentes o reporte de comparación inválido.
+- `0`: scan permitted; in CI there are no new errors and strict analysis is complete when enabled.
+- `1`: new error-level violations, or incomplete analysis in strict CI. Warnings alone do not fail CI. Existing CLI parsing/init error behavior remains unchanged.
+- `2`: invalid configuration, missing required paths, invalid language or comparison report, or an operation that cannot be completed.
 
-`--compare anterior.json` muestra deuda nueva/resuelta/persistente sin sustituir el baseline ni cambiar estos códigos. El reporte anterior se lee antes de escribir la salida, por lo que puedes usar la misma ruta para entrada y salida. La comparación incluye deuda tolerada y excluye violaciones suprimidas. Conserva la misma configuración para comparar refactorizaciones.
+`--compare before.json` adds an informational comparison without changing these criteria. It includes tolerated debt and excludes suppressed violations. Keep project/configuration consistent when comparing.
 
-## Verificación del paquete para mantenedores
+## Upgrading from 0.4
 
-Con Node 22/24: `npm ci`, `npm run build`, `npm test` y `npm run test:package`. La última orden empaqueta e instala en un directorio temporal, ejecuta la CLI instalada y comprueba el HTML sin scripts externos. Puede necesitar red para resolver dependencias. El workflow repite la verificación en Linux, Windows y macOS y comprueba la CLI compilada con Node 18.
+0.5 defaults to English; use `--lang es` to retain Spanish presentation. JSON `message` and `detail` fields and baseline v1 remain canonical Spanish data. Optional `diagnostic` metadata is additive. Old JSON reports without it remain comparable and show their stored text. Language changes do not introduce debt.
+
+## Maintainer validation
+
+Use Node 22 or 24: `npm ci`, `npx tsc --noEmit`, `npm test`, `npm run build`, and `npm run test:package`. The package check installs a tarball in a temporary directory and verifies CLI and offline HTML. CI runs on Linux, Windows and macOS with Node 22/24, plus a minimum Node 18 runtime check.

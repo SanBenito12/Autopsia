@@ -1,3 +1,4 @@
+import { format } from "../i18n";
 import { AutopsiaConfig, Dependency, FileNode, Violation } from '../types';
 import { dependencySuppressed, isSuppressed } from '../ignores';
 
@@ -28,13 +29,13 @@ export function checkDirectDataAccess(
       const hit = config.dataAccessModules.find((m) => matchesModule(ext, m));
       if (hit) {
         const evidence = 'kind' in occurrence ? occurrence as Dependency : undefined;
-        const violation: Violation = {
+        const violation: Violation = { diagnostic: { message: { code: "rule.data", params: {p0: ext, p1: node.layer} }, detail: { code: "rule.repository", params: {} } },
           rule: 'direct-data-access',
           severity: 'error',
           file: node.path,
           line: evidence?.line,
-          message: `Acceso directo a datos/red ("${ext}") en capa "${node.layer}"`,
-          detail: 'Debe pasar por un repositorio o caso de uso',
+          message: format("rule.data", {p0: ext, p1: node.layer}, "es"),
+          detail: format("rule.repository", {}, "es"),
         };
         if (evidence ? dependencySuppressed(evidence, 'direct-data-access') : isSuppressed(node, 'direct-data-access', { external: ext })) {
           violation.suppressed = true;

@@ -22,8 +22,8 @@ describe('autopsia scan sin argumento', () => {
     const conPunto = runScan(['.']);
 
     expect(sinArg.status).toBe(0);
-    expect(sinArg.stdout).toContain('8 archivos analizados');
-    expect(sinArg.stdout).toContain('Total: 5 violaciones');
+    expect(sinArg.stdout).toContain('8 files analyzed');
+    expect(sinArg.stdout).toContain('Total: 5 violations');
 
     // mismo cwd, mismo default: el reporte debe ser idéntico
     expect(sinArg.stdout).toBe(conPunto.stdout);

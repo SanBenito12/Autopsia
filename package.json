@@ -1,7 +1,7 @@
 {
   "name": "autopsia-rn",
-  "version": "0.4.0",
-  "description": "Auditor de Clean Architecture para proyectos React Native / TypeScript. ESLint te dice si tu código está bien escrito; Autopsia te dice si tu arquitectura está bien construida.",
+  "version": "0.5.0",
+  "description": "Stop new architecture violations in React Native / TypeScript. Configurable dependency rules, legacy baselines, CI checks and offline visual reports.",
   "bin": {
     "autopsia": "dist/index.js"
   },
@@ -22,7 +22,7 @@
   "bugs": {
     "url": "https://github.com/SanBenito12/Autopsia/issues"
   },
-  "homepage": "https://github.com/SanBenito12/Autopsia#readme",
+  "homepage": "https://sanbenito12.github.io/Autopsia/",
   "scripts": {
     "dev": "tsx src/index.ts",
     "build": "tsc && node scripts/build.cjs",
@@ -31,7 +31,8 @@
     "prepublishOnly": "npm run build && npm test && npm run test:package",
     "scan:fixture": "tsx src/index.ts scan fixtures/sample-app --config fixtures/sample-app/autopsia.config.json",
     "scan:alias": "tsx src/index.ts scan fixtures/alias-app --config fixtures/alias-app/autopsia.config.json",
-    "demo:html": "tsx src/index.ts scan fixtures/sample-app --config fixtures/sample-app/autopsia.config.json --html demo/report.html"
+    "demo:html": "tsx src/index.ts scan fixtures/sample-app --config fixtures/sample-app/autopsia.config.json --html demo/report.html",
+    "demo:walkthrough": "node scripts/demo-walkthrough.cjs"
   },
   "keywords": [
     "clean-architecture",
@@ -39,7 +40,11 @@
     "static-analysis",
     "architecture",
     "lint",
-    "ast"
+    "ast",
+    "typescript",
+    "cli",
+    "dependency-graph",
+    "architecture-testing"
   ],
   "license": "MIT",
   "dependencies": {

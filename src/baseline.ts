@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import chalk from 'chalk';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -100,10 +101,10 @@ export function applyBaseline(
 
 /** Salida en consola tras guardar el baseline. */
 export function printBaselineSaved(file: string, count: number): void {
-  console.log(chalk.green(`  ✔ Baseline guardado en ${file}`));
+  console.log(chalk.green(t("baseline.saved", {p0: file})));
   console.log(
     chalk.gray(
-      `    ${count} violación(es) tolerada(s). Los próximos scans solo fallarán con violaciones NUEVAS.`
+      t("baseline.hint", {p0: count})
     )
   );
   console.log('');
