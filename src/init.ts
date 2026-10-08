@@ -1,10 +1,11 @@
-import { t } from "./i18n";
+import { t, present } from "./i18n";
 import chalk from 'chalk';
 import * as fs from 'fs';
 import * as path from 'path';
 import { AutopsiaConfig, LayerConfig, RuleLevel } from './types';
 import { ALL_RULES } from './rules/run';
 import { buildGraph } from './scanner';
+import { loadTsconfig } from './tsconfig';
 
 /**
  * `autopsia init` — genera un autopsia.config.json detectando la estructura
@@ -120,12 +121,51 @@ export function exampleConfig(): AutopsiaConfig {
   return buildConfig(LAYER_CANDIDATES.map((c) => ({ name: c.name, folders: [c.folders[0]] })));
 }
 
-export type InitStatus = 'created' | 'created-example' | 'exists';
+export interface InitOptions { preset?: 'react-native'; dryRun?: boolean }
+
+/** Explicit opt-in proposal; unknown shared folders never become a catch-all layer. */
+export function buildReactNativeConfig(root: string): AutopsiaConfig {
+  const detected = detectLayers(root);
+  const add = (name: string, folder: string) => {
+    const found = detected.find(layer => layer.name === name);
+    if (found) { if (!found.folders.includes(folder)) found.folders.push(folder); }
+    else detected.push({ name, folders: [folder] });
+  };
+  const children = (folder: string): string[] => fs.existsSync(folder) && fs.statSync(folder).isDirectory()
+    ? fs.readdirSync(folder, { withFileTypes: true }).filter(e => e.isDirectory()).map(e => e.name).sort() : [];
+  const scopes = ['', ...children(path.join(root, 'src/features')).map(f => `features/${f}/`)];
+  for (const scope of scopes) {
+    if (children(path.join(root, 'src', scope)).includes('application')) add('application', `${scope}application`);
+    for (const name of children(path.join(root, 'src', scope, 'shared'))) {
+      if (['presentation', 'domain', 'data', 'infrastructure', 'application'].includes(name)) add(name, `${scope}shared/${name}`);
+    }
+  }
+  for (const folder of ['app', 'di']) if (children(path.join(root, 'src')).includes(folder)) add('composition', folder);
+  const hasApp = fs.existsSync(path.join(root, 'App.tsx')) && fs.statSync(path.join(root, 'App.tsx')).isFile();
+  const config = detected.length ? buildConfig(detected) : hasApp ? buildConfig([]) : exampleConfig();
+  if (hasApp) {
+    const composition = config.layers.find(l => l.name === 'composition');
+    if (composition) composition.files = ['App.tsx'];
+    else config.layers.push({ name: 'composition', files: ['App.tsx'] });
+  }
+  const directions: Record<string, string[]> = { presentation: ['application', 'domain'], application: ['domain'],
+    data: ['infrastructure', 'domain'], infrastructure: ['domain'], domain: [] };
+  const names = config.layers.map(l => l.name);
+  for (const layer of config.layers) {
+    layer.allowedDependencies = layer.name === 'composition' ? names.filter(n => n !== 'composition')
+      : (directions[layer.name] ?? []).filter(n => names.includes(n));
+  }
+  return config;
+}
+
+export type InitStatus = 'created' | 'created-example' | 'exists' | 'preview';
 
 export interface InitResult {
   status: InitStatus;
   configPath: string;
   detected: DetectedLayer[];
+  config?: AutopsiaConfig;
+  example?: boolean;
 }
 
 export interface InitCoverage {
@@ -150,25 +190,28 @@ export function measureConfigCoverage(root: string, config: AutopsiaConfig): Ini
  * Genera <root>/autopsia.config.json. Nunca sobrescribe un config existente
  * salvo con force=true.
  */
-export function initProject(root: string, force = false): InitResult {
+export function initProject(root: string, force = false, options: InitOptions = {}): InitResult {
   const configPath = path.join(root, 'autopsia.config.json');
   const detected = detectLayers(root);
 
-  if (fs.existsSync(configPath) && !force) {
+  if (fs.existsSync(configPath) && !force && !options.dryRun) {
     return { status: 'exists', configPath, detected };
   }
 
-  const config = detected.length > 0 ? buildConfig(detected) : exampleConfig();
+  const config = options.preset ? buildReactNativeConfig(root) : detected.length > 0 ? buildConfig(detected) : exampleConfig();
+  const example = !config.layers.some(layer => (layer.files ?? []).some(file => fs.existsSync(path.join(root, file))) ||
+    (layer.patterns ?? []).some(pattern => fs.existsSync(path.join(root, pattern.replace(/\*$/, '')))));
+  if (options.dryRun) return { status: 'preview', configPath, detected, config, example };
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf-8');
 
-  return { status: detected.length > 0 ? 'created' : 'created-example', configPath, detected };
+  return { status: example ? 'created-example' : 'created', configPath, detected, example };
 }
 
 /** Ejecuta init desde la CLI, con salida en consola. Devuelve el exit code. */
-export function runInit(root: string, force = false): number {
+export function runInit(root: string, force = false, options: InitOptions = {}): number {
   console.log(chalk.gray(t("init.inspect", {p0: root})));
 
-  const result = initProject(root, force);
+  const result = initProject(root, force, options);
 
   if (result.status === 'exists') {
     console.error(chalk.red(t("init.exists", {p0: result.configPath})));
@@ -176,11 +219,24 @@ export function runInit(root: string, force = false): number {
     return 1;
   }
 
-  const generatedConfig = JSON.parse(fs.readFileSync(result.configPath, 'utf-8')) as AutopsiaConfig;
+  const generatedConfig = result.config ?? JSON.parse(fs.readFileSync(result.configPath, 'utf-8')) as AutopsiaConfig;
+  if (options.dryRun) {
+    console.log(t('init.preview'));
+    if (fs.existsSync(result.configPath)) console.log(t('init.existingPreview'));
+  }
+  if (options.preset || options.dryRun) {
+    console.log(t('init.policy'));
+    console.log(JSON.stringify(generatedConfig, null, 2));
+  }
+  for (const issue of loadTsconfig(root).issues) {
+    console.log(present(issue).message);
+    console.log(issue.detail);
+    console.log(t('doctor.tsconfigFix'));
+  }
   const coverage = measureConfigCoverage(root, generatedConfig);
   const lowCoverage = coverage.totalFiles > 0 && coverage.percent < 80;
 
-  if (result.status === 'created-example') {
+  if (result.example) {
     console.log(chalk.yellow(t("init.noLayers", {})));
     console.log(chalk.gray(t("init.example", {})));
     console.log(chalk.gray(t("init.patterns", {})));
@@ -192,8 +248,8 @@ export function runInit(root: string, force = false): number {
         ? chalk.yellow(t("init.partial", {}))
         : chalk.green(t("init.detected", {}))
     );
-    for (const layer of result.detected) {
-      console.log(`    ${layer.name.padEnd(16)} ${chalk.gray('← src/' + layer.folders.join(', src/'))}`);
+    for (const layer of generatedConfig.layers) {
+      console.log(`    ${layer.name.padEnd(16)} ${chalk.gray([...(layer.patterns ?? []), ...(layer.files ?? [])].join(', '))}`);
     }
   }
 
@@ -203,13 +259,13 @@ export function runInit(root: string, force = false): number {
     if (lowCoverage) {
       console.log(chalk.yellow(t("init.low", {p0: coverageText})));
       console.log(chalk.gray(t("init.adjust", {})));
-      for (const file of coverage.unclassifiedExamples) console.log(chalk.gray(t("init.unclassified", {p0: file})));
     } else {
       console.log(chalk.green(t("init.initial", {p0: coverageText})));
     }
   }
 
-  console.log(chalk.bold(t("init.saved", {p0: result.configPath})));
+  for (const file of coverage.unclassifiedExamples) console.log(chalk.gray(t("init.unclassified", {p0: file})));
+  if (!options.dryRun) console.log(chalk.bold(t("init.saved", {p0: result.configPath})));
   console.log(chalk.gray(t("init.rules", {})));
   console.log(chalk.gray(t("init.levels", {})));
   console.log(chalk.gray(t("init.try", {p0: root})));

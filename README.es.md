@@ -1,5 +1,7 @@
 # 🔬 Autopsia
 
+> **0.6.0 — preparación local, todavía sin publicar.** Los comandos con `@0.6.0` requieren su publicación. Para probar el paquete local consulta [la guía de migración](docs/migration-0.6.es.md). La versión publicada sigue siendo 0.5.0.
+
 [![CI](https://github.com/SanBenito12/Autopsia/actions/workflows/ci.yml/badge.svg)](https://github.com/SanBenito12/Autopsia/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/autopsia-rn)](https://www.npmjs.com/package/autopsia-rn)
 
@@ -16,8 +18,11 @@ Autopsia comprueba dependencias TypeScript contra reglas de capas configuradas. 
 Requiere Node 18+. Desde la raíz de tu proyecto:
 
 ```bash
-npx autopsia-rn@0.5.0 init --lang es
-npx autopsia-rn@0.5.0 scan . --lang es --html --open
+npx autopsia-rn@0.6.0 init --preset react-native --dry-run --lang es
+# Revisa la propuesta antes de guardarla:
+npx autopsia-rn@0.6.0 init --preset react-native --lang es
+npx autopsia-rn@0.6.0 doctor . --lang es
+npx autopsia-rn@0.6.0 scan . --lang es --html --open
 ```
 
 Revisa la configuración y cobertura. `init` detecta nombres comunes bajo `src/` y `src/features/*/`; otras estructuras requieren patrones manuales.
@@ -25,8 +30,8 @@ Revisa la configuración y cobertura. `init` detecta nombres comunes bajo `src/`
 ## Adopta con deuda existente
 
 ```bash
-npx autopsia-rn@0.5.0 scan . --lang es --update-baseline
-npx autopsia-rn@0.5.0 scan . --lang es --ci
+npx autopsia-rn@0.6.0 scan . --lang es --update-baseline
+npx autopsia-rn@0.6.0 scan . --lang es --ci
 ```
 
 Commitea `autopsia.config.json` y `autopsia-baseline.json`. Los errores nuevos fallan CI; con `strict: true`, el análisis incompleto también falla. La deuda tolerada sigue visible. Nunca regeneres el baseline automáticamente en CI.
@@ -48,7 +53,7 @@ Autopsia verifica dependencias según tu configuración; no certifica la calidad
 
 ## Idiomas y compatibilidad
 
-0.5 usa inglés por defecto. `--lang es` cambia terminal y HTML y funciona antes o después del subcomando. El JSON conserva `message` y `detail` canónicos en español y añade metadatos opcionales `diagnostic`. Los baselines v1 de 0.4 siguen funcionando; los reportes antiguos sin metadatos muestran su texto original.
+Desde 0.5, inglés es el idioma por defecto. `--lang es` cambia terminal y HTML y funciona antes o después del subcomando. El JSON conserva `message` y `detail` canónicos en español y añade metadatos opcionales `diagnostic`. Los baselines v1 de 0.4 siguen funcionando; los reportes antiguos sin metadatos muestran su texto original.
 
 ## Evidencia reproducible
 
@@ -68,3 +73,13 @@ El mantenedor reportó anteriormente 25 hallazgos en menos de dos segundos sobre
 Cuéntanos cuánto tardaste en obtener un reporte útil y qué hallazgos no te parecen correctos mediante un [issue](https://github.com/SanBenito12/Autopsia/issues).
 
 MIT © Salvador Castillo.
+
+## Diagnosticar antes de aceptar deuda
+
+`doctor` explica preparación y cobertura: archivos sin capa, coincidencias ambiguas, imports internos sin resolver y problemas al cargar `tsconfig` o sus `extends`. No modifica el proyecto ni comprueba las cuatro reglas: para eso ejecuta `scan`. Guarda todas las incidencias con `doctor . --output doctor.json`; la consola muestra hasta diez.
+
+El preset `react-native` es optativo. Propone `application`, composición (`src/app`, `src/di`, `App.tsx`) y subcarpetas inequívocas de `shared`. No asigna una capa comodín a carpetas ambiguas. Revisa las direcciones permitidas y completa pendientes con ayuda de `doctor`. `--dry-run` nunca escribe, incluso con `--force`.
+
+La exclusión de tipos ahora reconoce imports ordinarios cuyos símbolos TypeScript resuelve exclusivamente como tipos, incluidos alias y reexportaciones con nombres. Imports mixtos, clases, enums, namespaces, reexportaciones `export *`, efectos secundarios y símbolos inciertos conservan aristas. No sustituye el análisis del bundle de Metro.
+
+[Configuración](docs/configuration.es.md) · [Migración 0.5 → 0.6](docs/migration-0.6.es.md)

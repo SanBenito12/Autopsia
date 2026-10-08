@@ -28,7 +28,7 @@ export function checkForbiddenExternal(
     if (!forbidden) continue;
 
     const occurrences = node.dependencies
-      ? node.dependencies.filter((d) => d.external && node.externalImports.includes(d.specifier))
+      ? node.dependencies.filter((d) => d.external && !d.typeOnly && node.externalImports.includes(d.specifier))
       : node.externalImports.map((specifier) => ({ specifier }));
     for (const occurrence of occurrences) {
       const ext = occurrence.specifier;

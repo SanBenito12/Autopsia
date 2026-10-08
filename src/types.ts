@@ -3,7 +3,9 @@ export interface LayerConfig {
   /** Nombre de la capa, p. ej. "presentation" */
   name: string;
   /** Patrones de ruta (substring o glob simple con *) que identifican la capa */
-  patterns: string[];
+  patterns?: string[];
+  /** Exact, case-sensitive paths relative to the scanned root, using / separators. */
+  files?: string[];
   /**
    * Capas de las que ESTA capa puede depender.
    * Si es null/omitido, no hay restricción.
@@ -82,6 +84,7 @@ export interface FileNode {
 }
 
 export type AnalysisIssueKind =
+  | 'tsconfig-error'
   | 'empty-project'
   | 'unanalyzable-import'
   | 'invalid-config'

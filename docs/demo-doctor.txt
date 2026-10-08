@@ -1,0 +1,7 @@
+Doctor: fixtures/sample-app
+Configuration: fixtures/sample-app/autopsia.config.json
+TypeScript configuration: fixtures/sample-app/tsconfig.json
+TypeScript: 5.5.2
+Files scanned: 8; classified: 8
+Detected structure: presentation: presentation; domain: domain; data: data; infrastructure: infrastructure
+Ready: no readiness or coverage blockers. Run scan to check dependency rules.

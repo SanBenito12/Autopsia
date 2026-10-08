@@ -1,5 +1,7 @@
 # CI with GitHub Actions
 
+> Guide for the local 0.6.0 preparation, not yet published. [Local installation and migration](migration-0.6.md).
+
 English · [Español](ci.es.md)
 
 Commit your reviewed `autopsia.config.json` and, for a legacy project, `autopsia-baseline.json`. Add `.github/workflows/architecture.yml`:
@@ -19,7 +21,7 @@ jobs:
         with:
           node-version: 22
       - name: Check architecture
-        run: npx --yes autopsia-rn@0.5.0 scan . --ci --html autopsia-report.html
+        run: npx --yes autopsia-rn@0.6.0 scan . --ci --html autopsia-report.html
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -34,8 +36,8 @@ The explicit version makes updates intentional. `if: always()` preserves the rep
 Run locally once after reviewing configuration and coverage:
 
 ```bash
-npx autopsia-rn@0.5.0 init
-npx autopsia-rn@0.5.0 scan . --update-baseline
+npx autopsia-rn@0.6.0 init
+npx autopsia-rn@0.6.0 scan . --update-baseline
 ```
 
 Commit both configuration and baseline. CI should run `scan --ci`, never automatically `--update-baseline`. Existing tolerated debt does not fail CI; new error-level occurrences do. Incomplete strict analysis still fails, including an empty scan or a computed import that cannot be resolved statically.
@@ -57,3 +59,11 @@ When fixing old debt, regenerate and review the baseline in the same PR. A growi
 ## Maintainer validation
 
 Use Node 22 or 24: `npm ci`, `npx tsc --noEmit`, `npm test`, `npm run build`, and `npm run test:package`. The package check installs a tarball in a temporary directory and verifies CLI and offline HTML. CI runs on Linux, Windows and macOS with Node 22/24, plus a minimum Node 18 runtime check.
+
+## Readiness and migration to 0.6
+
+Run `doctor` during project setup; use `scan --ci` as the change gate. `doctor` does not evaluate dependency rules and does not replace a scan.
+
+Loading failures in `tsconfig` and its `extends` chain are now recorded as `tsconfig-error` and cause exit 1 in strict CI, even with a baseline. Install declared dependencies and fix paths/syntax. General application typecheck errors do not become architecture violations. A scan without `--ci` retains exit 0 when it can produce a report, even if coverage is incomplete.
+
+Version-1 baselines and canonical JSON remain compatible. Imports referring only to types may stop producing findings; additional occurrences of persistent violations remain detectable. Never regenerate the baseline automatically. [Full migration](migration-0.6.md).

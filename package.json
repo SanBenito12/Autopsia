@@ -1,6 +1,6 @@
 {
   "name": "autopsia-rn",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Stop new architecture violations in React Native / TypeScript. Configurable dependency rules, legacy baselines, CI checks and offline visual reports.",
   "bin": {
     "autopsia": "dist/index.js"

@@ -1,5 +1,7 @@
 [English](rules.md) · Español
 
+> Guía de la 0.6.0 local, aún sin publicar. [Instalación local y migración](migration-0.6.es.md).
+
 # Reglas
 
 Autopsia trae 4 reglas. Para cada una: qué detecta, un ejemplo de código que la rompe, el fix, por qué importa en una app real, y cómo ignorarla cuando hay una razón legítima.
@@ -267,8 +269,14 @@ import { serialize } from './serializers';
 | Excepción puntual y justificada en una línea | `autopsia-ignore-next-line` con regla y razón |
 | Una regla no aplica (aún) a tu proyecto | `"rules": { "<regla>": "warning" }` u `"off"` en el [config](configuration.es.md) |
 
-## Idioma y alcance (0.5)
+## Idioma y alcance
 
 La salida predeterminada está en inglés. Usa `--lang es` antes o después de `scan` o `init` para mostrar español, incluido el HTML. El JSON y baseline v1 mantienen sus mensajes canónicos en español para conservar compatibilidad; los metadatos `diagnostic` son opcionales. Los reportes antiguos sin ellos muestran su texto original.
 
 Autopsia comprueba dependencias contra reglas configuradas. No certifica toda la arquitectura ni detecta llamadas globales a `fetch()`. Los imports exclusivamente de tipos se excluyen de las reglas.
+
+## Tipos y evidencia en 0.6
+
+Se excluyen imports explícitos de tipos y bindings ordinarios resueltos exclusivamente a interfaces o aliases de tipos. Se siguen alias y reexportaciones con nombres. Si una declaración mezcla tipos y valores, conserva su arista completa. Clases, enums, namespaces, `export *`, imports de efectos secundarios y símbolos inciertos conservan dependencias.
+
+Esto puede resolver ciclos aparentes de versiones anteriores. La evidencia permanece en JSON como `typeOnly`; las reglas y el grafo de ejecución la excluyen. No se reescribe tu código ni se reproduce todo el comportamiento de Metro.

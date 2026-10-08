@@ -1,5 +1,7 @@
 # Getting started
 
+> Guide for the local 0.6.0 preparation, not yet published. [Local installation and migration](migration-0.6.md).
+
 English · [Español](getting-started.es.md)
 
 Stop new architecture violations without fixing all your legacy debt first. Requires Node 18 or newer. Run commands from your project root.
@@ -19,18 +21,28 @@ The UI uses domain contracts and use cases. Data and infrastructure implement th
 ## 1. Generate and review your config
 
 ```bash
-npx autopsia-rn@0.5.0 init
+npx autopsia-rn@0.6.0 init --preset react-native --dry-run
+# Review the proposal, then save it:
+npx autopsia-rn@0.6.0 init --preset react-native
 ```
 
-Autopsia detects common layer names under `src/` and `src/features/<feature>/`. If it cannot recognize your structure, it generates an example and tells you to adjust it. Review `patterns`, `allowedDependencies`, and `dataAccessModules` in `autopsia.config.json`.
+Autopsia detects common layer names under `src/` and `src/features/<feature>/`. If it cannot recognize your structure, it generates an example and tells you to adjust it. The optional React Native preset adds application/composition and recognized shared subfolders; ambiguous folders remain pending. Omit `--preset` to keep the original detector. Review `patterns`, `files`, `allowedDependencies`, and `dataAccessModules` in `autopsia.config.json`.
 
 Low coverage means the configuration needs work. Baselines do not excuse unclassified files, ambiguous patterns, unresolved internal dependencies or computed imports in strict CI. See [configuration](configuration.md).
 
-## 2. Run a scan
+## 2. Check readiness
 
 ```bash
-npx autopsia-rn@0.5.0 scan .
-npx autopsia-rn@0.5.0 scan . --html --open
+npx autopsia-rn@0.6.0 doctor . --output doctor.json
+```
+
+Doctor explains coverage gaps, ambiguous matches and tsconfig loading failures without changing your project. Review its recommendations before accepting debt. It does not evaluate dependency rules or replace a scan. Keep existing configuration unless you deliberately intend to replace it with `init --force`.
+
+## 3. Run a scan
+
+```bash
+npx autopsia-rn@0.6.0 scan .
+npx autopsia-rn@0.6.0 scan . --html --open
 ```
 
 The terminal shows coverage, violations with source lines, and files with the most violations. The offline HTML graph colors files by layer and highlights violating internal dependencies in red. [Explore the sample report](https://sanbenito12.github.io/Autopsia/report.html).
@@ -44,8 +56,8 @@ Layer health is the percentage of classified files without violations, including
 Record existing violations once:
 
 ```bash
-npx autopsia-rn@0.5.0 scan . --update-baseline
-npx autopsia-rn@0.5.0 scan . --ci
+npx autopsia-rn@0.6.0 scan . --update-baseline
+npx autopsia-rn@0.6.0 scan . --ci
 ```
 
 Commit `autopsia.config.json` and `autopsia-baseline.json`. CI then fails on **new error-level violations**, or on incomplete analysis with `strict: true`. Existing baseline debt remains visible and does not fail CI by itself.
@@ -57,8 +69,8 @@ Use `--no-baseline` to inspect all debt. Baselines remain version 1 and preserve
 ## English and Spanish
 
 ```bash
-npx autopsia-rn@0.5.0 --lang es init
-npx autopsia-rn@0.5.0 scan . --lang es --html
+npx autopsia-rn@0.6.0 --lang es init
+npx autopsia-rn@0.6.0 scan . --lang es --html
 ```
 
 English is the default. `--lang en|es` selects terminal and HTML presentation. JSON keeps canonical Spanish diagnostic text; optional `diagnostic` metadata supports translated presentation. Older reports without metadata retain their original text when displayed. Changing language never changes rule results or baseline identity.

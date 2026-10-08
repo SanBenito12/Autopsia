@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import { AnalysisIssue, AnalysisIssueKind, ScanResult, Violation } from './types';
 
 const issueLabels = (): Record<AnalysisIssueKind, string> => ({
+  'tsconfig-error': 'tsconfig',
   'empty-project': t("report.empty", {}),
   'unanalyzable-import': t("report.unanalyzable", {}),
   'unclassified-file': t("report.unclassified", {}),
@@ -23,6 +24,7 @@ function formatPercent(value: number): string {
 
 function printIssueGroups(issues: AnalysisIssue[]): void {
   const order: AnalysisIssueKind[] = [
+    'tsconfig-error',
     'empty-project',
     'unanalyzable-import',
     'unclassified-file',
@@ -37,6 +39,7 @@ function printIssueGroups(issues: AnalysisIssue[]): void {
     for (const issue of group.slice(0, 5)) {
       const location = issue.file ? `${issue.file}${issue.line ? `:${issue.line}` : ''}` : '';
       console.log(`      ${location ? chalk.cyan(location) + ' · ' : ''}${present(issue).message}`);
+      if (kind === 'tsconfig-error') { console.log(`      ${issue.detail ?? ''}`); console.log(`      ${t('doctor.tsconfigFix')}`); }
     }
     if (group.length > 5) console.log(chalk.gray(t("report.more", {p0: group.length - 5})));
   }

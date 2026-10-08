@@ -33,8 +33,10 @@ export function validateConfig(config: AutopsiaConfig): AnalysisIssue[] {
       issues.push({ diagnostic: { message: { code: "config.duplicate", params: {p0: layer.name} } }, kind: 'invalid-config', message: format("config.duplicate", {p0: layer.name}, "es") });
     }
     names.add(layer.name);
-    if (!strings(layer.patterns) || layer.patterns.length === 0) {
-      issues.push({ diagnostic: { message: { code: "config.patterns", params: {p0: layer.name} } }, kind: 'invalid-config', message: format("config.patterns", {p0: layer.name}, "es") });
+    if ((layer.patterns !== undefined && !strings(layer.patterns)) ||
+        (layer.files !== undefined && (!strings(layer.files) || layer.files.some((file) => /[\\:*?]/.test(file) || file.startsWith('/') || file.split('/').some((part) => !part || part === '.' || part === '..')))) ||
+        (!(layer.patterns?.length) && !(layer.files?.length))) {
+      issues.push({ diagnostic: { message: { code: "config.paths", params: {p0: layer.name} } }, kind: 'invalid-config', message: format("config.paths", {p0: layer.name}, "es") });
     }
     if (layer.forbiddenExternal !== undefined && !strings(layer.forbiddenExternal)) issues.push({ diagnostic: { message: { code: "config.external", params: {p0: layer.name} } }, kind: 'invalid-config', message: format("config.external", {p0: layer.name}, "es") });
     if (layer.allowedDependencies !== undefined && !strings(layer.allowedDependencies)) {

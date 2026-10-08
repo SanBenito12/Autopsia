@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.6.0 — Unreleased
+
+- Add bilingual `doctor` readiness diagnostics and schema-versioned JSON recommendations.
+- Detect TypeScript configuration loading failures; strict CI cannot tolerate them through a baseline.
+- Add opt-in `init --preset react-native`, write-free `--dry-run`, application/composition proposals and exact per-layer `files` paths.
+- Exclude ordinary imports and named reexports proven to reference type-only symbols; preserve runtime and uncertain edges.
+- Preserve baseline v1 and canonical JSON identity; some apparent cycles from 0.5 may become resolved.
+- Update English/Spanish guides, migration instructions and offline public-fixture demo.
+
+This version is prepared locally and has not been published.
+
+
 ## [0.5.0] - 2026-09-23
 
 ### Added

@@ -1,5 +1,7 @@
 # 🔬 Autopsia
 
+> **0.6.0 — local release preparation, not published yet.** Commands using `@0.6.0` require publication. To test the local package see [the migration guide](docs/migration-0.6.md). The published version remains 0.5.0.
+
 [![CI](https://github.com/SanBenito12/Autopsia/actions/workflows/ci.yml/badge.svg)](https://github.com/SanBenito12/Autopsia/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/autopsia-rn)](https://www.npmjs.com/package/autopsia-rn)
 [![MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
@@ -19,8 +21,11 @@ Autopsia checks your TypeScript dependencies against configured layer rules. Rec
 Requires Node 18+. Run from your project root:
 
 ```bash
-npx autopsia-rn@0.5.0 init
-npx autopsia-rn@0.5.0 scan . --html --open
+npx autopsia-rn@0.6.0 init --preset react-native --dry-run
+# Review the proposal, then save it:
+npx autopsia-rn@0.6.0 init --preset react-native
+npx autopsia-rn@0.6.0 doctor .
+npx autopsia-rn@0.6.0 scan . --html --open
 ```
 
 Review the generated configuration and coverage first. `init` detects common layer names under `src/` and `src/features/*/`; other structures need manual patterns. If files are unclassified, adjust your config before relying on the report.
@@ -28,8 +33,8 @@ Review the generated configuration and coverage first. `init` detects common lay
 ## Adopt without fixing everything today
 
 ```bash
-npx autopsia-rn@0.5.0 scan . --update-baseline
-npx autopsia-rn@0.5.0 scan . --ci
+npx autopsia-rn@0.6.0 scan . --update-baseline
+npx autopsia-rn@0.6.0 scan . --ci
 ```
 
 Commit `autopsia.config.json` and `autopsia-baseline.json`. Existing debt stays visible; **new error-level violations fail CI**. In strict mode, incomplete analysis also fails. Never regenerate the baseline automatically in CI.
@@ -37,9 +42,9 @@ Commit `autopsia.config.json` and `autopsia-baseline.json`. Existing debt stays 
 After a refactor, compare your progress:
 
 ```bash
-npx autopsia-rn@0.5.0 scan . -o before.json
+npx autopsia-rn@0.6.0 scan . -o before.json
 # Refactor, then:
-npx autopsia-rn@0.5.0 scan . --compare before.json
+npx autopsia-rn@0.6.0 scan . --compare before.json
 ```
 
 See new, resolved and persistent violations, including tolerated debt. Comparison is informational; baseline and CI rules still decide whether a build passes.
@@ -61,10 +66,10 @@ The scanner follows imports, re-exports, `require()` and dynamic `import()`, res
 
 ## English and Spanish
 
-English is the default in 0.5. For Spanish terminal output and HTML:
+English has been the default since 0.5. For Spanish terminal output and HTML:
 
 ```bash
-npx autopsia-rn@0.5.0 scan . --lang es --html --open
+npx autopsia-rn@0.6.0 scan . --lang es --html --open
 ```
 
 `--lang en|es` works before or after `scan` and `init`. Existing 0.4 baselines remain compatible. JSON retains canonical Spanish `message`/`detail` fields with optional diagnostic metadata; changing presentation language never introduces new debt. Older reports without metadata display their original text.
@@ -76,7 +81,7 @@ steps:
   - uses: actions/checkout@v4
   - uses: actions/setup-node@v4
     with: { node-version: 22 }
-  - run: npx --yes autopsia-rn@0.5.0 scan . --ci
+  - run: npx --yes autopsia-rn@0.6.0 scan . --ci
 ```
 
 Commit your config and baseline first. [Full workflow with HTML artifacts](https://github.com/SanBenito12/Autopsia/blob/main/docs/ci.md).
@@ -103,3 +108,13 @@ The maintainer previously reported 25 findings in under two seconds on one produ
 Trying Autopsia on your app? [Open an issue](https://github.com/SanBenito12/Autopsia/issues) with your folder structure, time to first useful report and any findings you disagree with. Remove private code and secrets from examples.
 
 MIT © Salvador Castillo. Built with TypeScript, ts-morph, commander and D3.
+
+## Diagnose before accepting debt
+
+`doctor` explains readiness and coverage: unclassified files, ambiguous matches, unresolved internal imports and failures loading `tsconfig` or its `extends` chain. It does not modify the project or evaluate the four dependency rules: use `scan` for those. Save all issues with `doctor . --output doctor.json`; the terminal shows up to ten.
+
+The `react-native` preset is opt-in. It proposes `application`, composition (`src/app`, `src/di`, `App.tsx`) and unambiguous layer subfolders of `shared`. It never assigns a catch-all layer to ambiguous folders. Review allowed directions and resolve remaining gaps with `doctor`. `--dry-run` never writes, even with `--force`.
+
+Type exclusion now recognizes ordinary imports whose TypeScript symbols resolve exclusively to types, including aliases and named reexports. Mixed imports, classes, enums, namespaces, `export *`, side effects and uncertain symbols retain edges. This does not reproduce Metro's bundling transformations.
+
+[Configuration](docs/configuration.md) · [Migration 0.5 → 0.6](docs/migration-0.6.md)

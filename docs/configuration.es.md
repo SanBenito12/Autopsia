@@ -1,8 +1,10 @@
 [English](configuration.md) · Español
 
+> Guía de la 0.6.0 local, aún sin publicar. [Instalación local y migración](migration-0.6.es.md).
+
 # Configuración
 
-Todo vive en `autopsia.config.json`, en la raíz de tu proyecto. `npx autopsia-rn --lang es init` lo genera detectando tu estructura; esta página explica cada campo para cuando quieras ajustarlo.
+Todo vive en `autopsia.config.json`, en la raíz de tu proyecto. `npx autopsia-rn@0.6.0 --lang es init` lo genera detectando tu estructura; esta página explica cada campo para cuando quieras ajustarlo.
 
 Desde v0.4, `init` detecta tanto capas directamente bajo `src/` como bajo `src/features/<feature>/`. Genera patrones para las carpetas encontradas; vuelve a revisar el config al añadir nuevas funcionalidades. No infiere restricciones entre features ni configuraciones de monorepos. Con cobertura menor al 80%, muestra hasta cinco archivos sin capa para ayudarte a ajustar los patrones.
 
@@ -141,7 +143,7 @@ No es parte del config: es un archivo aparte que genera `scan --update-baseline`
 Si tu proyecto importa con aliases (`import { X } from '@/domain/...'`), Autopsia los resuelve usando el `tsconfig.json` de la raíz escaneada automáticamente. Si tu tsconfig con `paths` es otro:
 
 ```bash
-npx autopsia-rn --lang es scan . --tsconfig ./tsconfig.app.json
+npx autopsia-rn@0.6.0 --lang es scan . --tsconfig ./tsconfig.app.json
 ```
 
 ## Flags de `scan` (referencia rápida)
@@ -157,8 +159,40 @@ npx autopsia-rn --lang es scan . --tsconfig ./tsconfig.app.json
 | `--no-baseline` | Ignora el baseline en este scan |
 | `--tsconfig <file>` | tsconfig a usar para resolver path aliases |
 
-## Idioma y alcance (0.5)
+## Idioma y alcance
 
 La salida predeterminada está en inglés. Usa `--lang es` antes o después de `scan` o `init` para mostrar español, incluido el HTML. El JSON y baseline v1 mantienen sus mensajes canónicos en español para conservar compatibilidad; los metadatos `diagnostic` son opcionales. Los reportes antiguos sin ellos muestran su texto original.
 
 Autopsia comprueba dependencias contra reglas configuradas. No certifica toda la arquitectura ni detecta llamadas globales a `fetch()`. Los imports exclusivamente de tipos se excluyen de las reglas.
+
+## Preset revisable y rutas exactas
+
+`init --preset react-native --dry-run` previsualiza la propuesta sin escribir; omite `--dry-run` para crear el archivo. Sin `--preset`, se conserva la detección anterior. Ninguna modalidad sobrescribe sin `--force`.
+
+| Capa | allowedDependencies |
+|---|---|
+| presentation | application, domain |
+| application | domain |
+| data | infrastructure, domain |
+| infrastructure | domain |
+| domain | [] |
+| composition | Todas las demás capas detectadas |
+
+Solo se incluyen destinos presentes. El preset añade `src/application`, `src/features/*/application`, `src/app`, `src/di` y el `App.tsx` raíz. Dentro de `src/shared` y `src/features/*/shared`, reconoce únicamente subcarpetas `presentation`, `application`, `domain`, `data` e `infrastructure`. `utils`, `context`, `store`, `config` y otras carpetas ambiguas quedan pendientes; no se infieren límites entre features.
+
+```json
+{ "name": "composition", "files": ["App.tsx"], "patterns": ["src/app/*", "src/di/*"], "allowedDependencies": ["presentation", "domain"] }
+```
+
+`files` es opcional: rutas exactas relativas a la raíz, sensibles a mayúsculas y con `/`. No admite rutas absolutas, comodines, segmentos vacíos, `.` ni `..`. Una capa necesita al menos una entrada en `patterns` o `files`; ambos pueden combinarse. `files: ["App.tsx"]` no coincide con `src/App.tsx`. Los patrones conservan su semántica anterior. Coincidencias entre distintas capas, sean exactas o por patrón, siguen siendo ambiguas.
+
+## doctor
+
+```bash
+npx autopsia-rn@0.6.0 doctor . --lang es --output doctor.json
+npx autopsia-rn@0.6.0 doctor . --config autopsia.config.json --tsconfig tsconfig.json
+```
+
+Acepta `[path]`, `-c/--config`, `--tsconfig`, `-o/--output` y `--lang en|es` antes o después del subcomando. `0`: preparado, sin bloqueos; `1`: falta preparación/cobertura; `2`: argumentos, configuración malformada o ejecución inválida.
+
+El JSON estable usa `schemaVersion: 1`, `status` (`ready`, `incomplete`, `error`), rutas de configuración, `typescriptVersion`, `totalFiles`, `coverage` (null si no puede evaluarse), `detected` e `issues`. Cada incidencia incluye `code`, mensaje canónico, recomendación, metadatos de traducción y ubicación cuando existe. Las ambigüedades incluyen `matches` con capa, patrones y archivos exactos. Cambiar idioma solo cambia la consola, no el JSON. Las recomendaciones no se aplican automáticamente.

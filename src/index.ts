@@ -13,6 +13,8 @@ import { openInBrowser, writeHtml } from './viewer';
 import { runInit } from './init';
 import { computeAnalysisCoverage, validateConfig } from './analysis';
 import { compareReports, loadReport, printComparison } from './compare';
+import { loadTsconfig } from './tsconfig';
+import { diagnose, printDoctor, resolveConfigPath } from './doctor';
 
 // Resolve presentation before building help. Commander remains responsible for parsing.
 const languageArgs = process.argv.slice(2);
@@ -82,11 +84,7 @@ program
       process.exit(2);
     }
 
-    const configPath = path.isAbsolute(opts.config)
-      ? opts.config
-      : fs.existsSync(path.join(root, opts.config))
-        ? path.join(root, opts.config)
-        : path.resolve(opts.config);
+    const configPath = resolveConfigPath(root, opts.config);
 
     if (!fs.existsSync(configPath)) {
       console.error(chalk.red(t("cli.missingConfig", {p0: root})));
@@ -119,7 +117,7 @@ program
 
     console.log(chalk.gray(t("cli.scanning", {p0: root})));
     const graph = buildGraph(root, config, opts.tsconfig);
-    const analysis = computeAnalysisCoverage(graph, config, configIssues);
+    const analysis = computeAnalysisCoverage(graph, config, [...configIssues, ...loadTsconfig(root, opts.tsconfig).issues]);
 
     const rawViolations = runRules(graph, config);
 
@@ -198,13 +196,31 @@ program
   .description(t("cli.init", {}))
   .argument('[path]', t("cli.initPath", {}), '.')
   .option('--force', t("cli.force", {}))
-  .action((initPath: string, opts: { force?: boolean }) => {
+  .option('--preset <preset>', t('init.preset'))
+  .option('--dry-run', t('init.dryRun'))
+  .action((initPath: string, opts: { force?: boolean; preset?: string; dryRun?: boolean }) => {
     const root = path.resolve(initPath);
     if (!fs.existsSync(root)) {
       console.error(chalk.red(t("cli.missingPath", {p0: root})));
       process.exit(2);
     }
-    process.exit(runInit(root, opts.force ?? false));
+    if (opts.preset !== undefined && opts.preset !== 'react-native') {
+      console.error(t('init.invalidPreset')); process.exit(2);
+    }
+    process.exit(runInit(root, opts.force ?? false, { preset: opts.preset, dryRun: opts.dryRun }));
+  });
+
+program.command('doctor')
+  .description(t('doctor.description'))
+  .argument('[path]', t('cli.path'), '.')
+  .option('-c, --config <file>', t('cli.config'), 'autopsia.config.json')
+  .option('--tsconfig <file>', t('cli.tsconfig'))
+  .option('-o, --output <file>', t('cli.output'))
+  .action((doctorPath: string, opts: { config: string; tsconfig?: string; output?: string }) => {
+    const report = diagnose(path.resolve(doctorPath), opts.config, opts.tsconfig);
+    printDoctor(report);
+    if (opts.output) fs.writeFileSync(opts.output, JSON.stringify(report, null, 2) + '\n');
+    process.exit(report.status === 'ready' ? 0 : report.status === 'incomplete' ? 1 : 2);
   });
 
 if (!['en', 'es'].includes(requestedLanguage)) {

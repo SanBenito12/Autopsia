@@ -1,5 +1,7 @@
 [English](ci.md) · Español
 
+> Guía de la 0.6.0 local, aún sin publicar. [Instalación local y migración](migration-0.6.es.md).
+
 # Autopsia en CI (GitHub Actions)
 
 La idea: cada PR corre `autopsia scan --ci`. Si alguien introduce una violación **nueva** de arquitectura, el build falla con el reporte completo en los logs. Las violaciones ya toleradas en el baseline no molestan.
@@ -27,18 +29,18 @@ jobs:
           node-version: 22
 
       - name: Auditar arquitectura
-        run: npx autopsia-rn --lang es scan . --ci
+        run: npx autopsia-rn@0.6.0 --lang es scan . --ci
 ```
 
-Eso es todo. Requisitos: `autopsia.config.json` commiteado (lo genera `npx autopsia-rn --lang es init`) y, si tu proyecto es legacy, `autopsia-baseline.json` también commiteado.
+Eso es todo. Requisitos: `autopsia.config.json` commiteado (lo genera `npx autopsia-rn@0.6.0 --lang es init`) y, si tu proyecto es legacy, `autopsia-baseline.json` también commiteado.
 
 ## Flujo con baseline (proyectos con deuda)
 
 1. **Una sola vez, en local:**
 
    ```bash
-   npx autopsia-rn --lang es init
-   npx autopsia-rn --lang es scan . --update-baseline
+   npx autopsia-rn@0.6.0 --lang es init
+   npx autopsia-rn@0.6.0 --lang es scan . --update-baseline
    git add autopsia.config.json autopsia-baseline.json
    git commit -m "chore: adoptar autopsia con baseline"
    ```
@@ -50,7 +52,7 @@ Eso es todo. Requisitos: `autopsia.config.json` commiteado (lo genera `npx autop
 3. **Cuando pagues deuda**, regenera el baseline en el mismo PR que arregla las violaciones:
 
    ```bash
-   npx autopsia-rn --lang es scan . --update-baseline
+   npx autopsia-rn@0.6.0 --lang es scan . --update-baseline
    git add autopsia-baseline.json
    ```
 
@@ -62,7 +64,7 @@ Eso es todo. Requisitos: `autopsia.config.json` commiteado (lo genera `npx autop
 
 ```yaml
       - name: Auditar arquitectura
-        run: npx autopsia-rn --lang es scan . --ci --html autopsia-report.html
+        run: npx autopsia-rn@0.6.0 --lang es scan . --ci --html autopsia-report.html
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -76,13 +78,13 @@ Eso es todo. Requisitos: `autopsia.config.json` commiteado (lo genera `npx autop
 **Fijar la versión** para builds reproducibles:
 
 ```yaml
-        run: npx autopsia-rn@0.5.0 scan . --ci
+        run: npx autopsia-rn@0.6.0 scan . --ci
 ```
 
 **Proyecto con path aliases** y tsconfig no estándar:
 
 ```yaml
-        run: npx autopsia-rn --lang es scan . --ci --tsconfig ./tsconfig.app.json
+        run: npx autopsia-rn@0.6.0 --lang es scan . --ci --tsconfig ./tsconfig.app.json
 ```
 
 ## Códigos de salida y comparación (v0.4)
@@ -97,8 +99,16 @@ Eso es todo. Requisitos: `autopsia.config.json` commiteado (lo genera `npx autop
 
 Con Node 22/24: `npm ci`, `npm run build`, `npm test` y `npm run test:package`. La última orden empaqueta e instala en un directorio temporal, ejecuta la CLI instalada y comprueba el HTML sin scripts externos. Puede necesitar red para resolver dependencias. El workflow repite la verificación en Linux, Windows y macOS y comprueba la CLI compilada con Node 18.
 
-## Idioma y alcance (0.5)
+## Idioma y alcance
 
 La salida predeterminada está en inglés. Usa `--lang es` antes o después de `scan` o `init` para mostrar español, incluido el HTML. El JSON y baseline v1 mantienen sus mensajes canónicos en español para conservar compatibilidad; los metadatos `diagnostic` son opcionales. Los reportes antiguos sin ellos muestran su texto original.
 
 Autopsia comprueba dependencias contra reglas configuradas. No certifica toda la arquitectura ni detecta llamadas globales a `fetch()`. Los imports exclusivamente de tipos se excluyen de las reglas.
+
+## Preparación y migración a 0.6
+
+Ejecuta `doctor` al configurar el proyecto; usa `scan --ci` como control de cambios. `doctor` no evalúa las reglas de dependencias y no sustituye al scan.
+
+Los fallos de carga de `tsconfig` y su cadena `extends` ahora se registran como `tsconfig-error` y provocan salida 1 en CI estricto, incluso con baseline. Instala las dependencias declaradas y corrige rutas/sintaxis. No se incorporan los errores generales del typecheck como violaciones arquitectónicas. `scan` sin `--ci` conserva salida 0 cuando consigue producir el reporte, aunque la cobertura sea incompleta.
+
+Se conservan baselines v1 y JSON canónico. Imports usados únicamente como tipos pueden dejar de producir hallazgos; las ocurrencias adicionales de violaciones que persisten siguen detectándose. No regeneres automáticamente el baseline. [Migración completa](migration-0.6.es.md).

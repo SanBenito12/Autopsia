@@ -1,9 +1,9 @@
 import { CallExpression, ImportDeclaration, Node, Project, SourceFile, SyntaxKind, ts } from 'ts-morph';
-import * as fs from 'fs';
 import * as path from 'path';
 import { AutopsiaConfig, Dependency, DependencyKind, FileNode, FileSuppressions } from './types';
 import { classifyFile } from './classifier';
 import { parseIgnoreDirectives } from './ignores';
+import { loadTsconfig } from './tsconfig';
 
 const DEFAULT_IGNORE = [
   'node_modules', 'dist', 'build', '.git', 'coverage', '__tests__', '__mocks__',
@@ -29,16 +29,29 @@ function isIgnored(relPath: string, ignore: string[]): boolean {
   });
 }
 
-/**
- * Resuelve un import relativo a una ruta relativa al root del proyecto,
- * siguiendo barrels (index.ts) para no dejar que "laven" violaciones.
- */
+/** Only erase edges when TypeScript proves every binding has no value. */
+function symbolIsTypeOnly(node: Node): boolean {
+  let symbol = node.getSymbol();
+  const seen = new Set<import('ts-morph').Symbol>();
+  while (symbol && (symbol.getFlags() & ts.SymbolFlags.Alias)) {
+    if (seen.has(symbol)) return false;
+    seen.add(symbol);
+    symbol = symbol.getAliasedSymbol();
+  }
+  return !!symbol && symbol.getDeclarations().length > 0 &&
+    !(symbol.getFlags() & ts.SymbolFlags.Value) &&
+    !!(symbol.getFlags() & ts.SymbolFlags.Type);
+}
+
 function importIsTypeOnly(decl: ImportDeclaration): boolean {
   if (decl.isTypeOnly()) return true;
-  // `import { type User } from './User'` también desaparece en runtime.
-  if (decl.getDefaultImport() || decl.getNamespaceImport()) return false;
-  const named = decl.getNamedImports();
-  return named.length > 0 && named.every((item) => item.isTypeOnly());
+  // Namespace objects and side-effect imports remain runtime dependencies.
+  if (decl.getNamespaceImport()) return false;
+  const bindings = decl.getNamedImports();
+  const defaultImport = decl.getDefaultImport();
+  return (bindings.length > 0 || !!defaultImport) &&
+    (!defaultImport || symbolIsTypeOnly(defaultImport)) &&
+    bindings.every(item => item.isTypeOnly() || symbolIsTypeOnly(item.getNameNode()));
 }
 
 function pathAliasMatches(specifier: string, project: Project): boolean {
@@ -184,7 +197,7 @@ function resolveDependencies(sourceFile: SourceFile, root: string): {
     const moduleSpecifier = decl.getModuleSpecifier();
     if (!moduleSpecifier) continue;
     const named = decl.getNamedExports();
-    const typeOnly = decl.isTypeOnly() || (named.length > 0 && named.every((item) => item.isTypeOnly()));
+    const typeOnly = decl.isTypeOnly() || (named.length > 0 && named.every((item) => item.isTypeOnly() || symbolIsTypeOnly(item.getNameNode())));
     recordDependency(
       decl.getModuleSpecifierValue() as string,
       're-export',
@@ -226,25 +239,8 @@ export function buildGraph(root: string, config: AutopsiaConfig, tsconfigPath?: 
 
   // Usar el tsconfig del proyecto analizado (si existe) para que ts-morph
   // resuelva sus path aliases (p. ej. "@/*": ["src/*"]).
-  const resolvedTsconfig = tsconfigPath
-    ? path.resolve(tsconfigPath)
-    : path.join(root, 'tsconfig.json');
-
-  const project = fs.existsSync(resolvedTsconfig)
-    ? new Project({
-        tsConfigFilePath: resolvedTsconfig,
-        skipAddingFilesFromTsConfig: true,
-      })
-    : new Project({
-        compilerOptions: {
-          allowJs: false,
-          jsx: 4, // react-jsx
-          esModuleInterop: true,
-          resolveJsonModule: true,
-          skipLibCheck: true,
-        },
-        skipAddingFilesFromTsConfig: true,
-      });
+  const loaded = loadTsconfig(root, tsconfigPath);
+  const project = new Project({ compilerOptions: loaded.options, skipAddingFilesFromTsConfig: true });
 
   project.addSourceFilesAtPaths([
     path.join(root, '**/*.ts'),
