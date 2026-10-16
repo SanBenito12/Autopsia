@@ -79,6 +79,34 @@ export function validateConfig(config: AutopsiaConfig): AnalysisIssue[] {
       issues.push({ diagnostic: { message: { code: "config.level", params: {p0: rule, p1: level} } }, kind: 'invalid-config', message: format("config.level", {p0: rule, p1: level}, "es") });
     }
   }
+
+  if (config.features !== undefined) {
+    const validCrossImports =
+      config.features &&
+      typeof config.features === 'object' &&
+      !Array.isArray(config.features) &&
+      (config.features.allowedCrossImports === undefined ||
+        (typeof config.features.allowedCrossImports === 'object' &&
+          config.features.allowedCrossImports !== null &&
+          !Array.isArray(config.features.allowedCrossImports) &&
+          Object.values(config.features.allowedCrossImports).every(
+            (v) => Array.isArray(v) && v.every((item) => typeof item === 'string' && item.trim().length > 0)
+          )));
+    if (
+      typeof config.features !== 'object' ||
+      config.features === null ||
+      Array.isArray(config.features) ||
+      (config.features.patterns !== undefined && !strings(config.features.patterns)) ||
+      (config.features.enforcePublicApi !== undefined && typeof config.features.enforcePublicApi !== 'boolean') ||
+      !validCrossImports
+    ) {
+      issues.push({
+        diagnostic: { message: { code: 'config.features', params: {} } },
+        kind: 'invalid-config',
+        message: format('config.features', {}, 'es'),
+      });
+    }
+  }
   return issues;
 }
 

@@ -1,15 +1,24 @@
 # Changelog
 
-## 0.6.0 — Unreleased
+## [0.6.0] - 2026-10-16
 
-- Add bilingual `doctor` readiness diagnostics and schema-versioned JSON recommendations.
-- Detect TypeScript configuration loading failures; strict CI cannot tolerate them through a baseline.
-- Add opt-in `init --preset react-native`, write-free `--dry-run`, application/composition proposals and exact per-layer `files` paths.
-- Exclude ordinary imports and named reexports proven to reference type-only symbols; preserve runtime and uncertain edges.
-- Preserve baseline v1 and canonical JSON identity; some apparent cycles from 0.5 may become resolved.
-- Update English/Spanish guides, migration instructions and offline public-fixture demo.
+### Added
+- **Feature Boundaries Rule (`feature-boundaries`)**: Enforce module boundaries and protect feature Public APIs (`index.ts`, including platform-suffixed entrypoints), with optional `allowedCrossImports`.
+- **Interactive Viewer 2.0 (`autopsia view`)**: Dedicated command to scan and open the offline D3 dependency graph with clickable terminal URLs, real-time file search, layer filter, "violations only" toggle, zoom reset, and red violation edges for `feature-boundaries`.
+- **Doctor Diagnostics (`autopsia doctor`)**: Bilingual readiness diagnostics (`en` / `es`) with schema-versioned JSON output (`--output`) covering unclassified files, ambiguous layer matches, unresolved internal imports, and `tsconfig` loading errors.
+- **Zero-Friction CI Setup (`autopsia setup-ci`)**: Generate a turnkey `.github/workflows/autopsia.yml` workflow with native GitHub Pull Request inline annotations (`--format github`) and Step Summary reports.
+- **Live Watch Mode (`autopsia scan --watch` / `autopsia view --watch`)**: Sub-second debounced file watcher for instant feedback during development.
+- **Smart Project & Package Detection (`autopsia init`)**:
+  - Auto-detect installed React Native data/storage/network libraries from `package.json` (`react-native-mmkv`, `expo-sqlite`, `expo-secure-store`, `@react-native-firebase/*`, `firebase`, `@apollo/client`, `drizzle-orm`, `@nozbe/watermelondb`, `realm`, `ky`, `@trpc/client`, `aws-amplify`).
+  - Auto-detect `features/*` and `modules/*` directories and configure `feature-boundaries`.
+  - Add `--preset react-native`, `--preset expo` (with automatic Expo Router `app/` detection), and write-free `--dry-run` mode, plus exact per-layer `files` paths.
+- **Bilingual Guides**: Add recipes for Expo Router and Feature Architecture in English and Spanish.
 
-This version is prepared locally and has not been published.
+### Changed & Improved
+- **React Native Platform Suffix Resolution**: Automatically resolve `.ios`, `.android`, `.native`, and `.web` module suffixes when `moduleSuffixes` is not explicitly set in `tsconfig.json`, preventing false `unresolved-import` issues in strict mode.
+- **Semantic Type-Only Exclusion**: Exclude ordinary imports and named re-exports proven by TypeScript to reference only types (interfaces, type aliases) across all rules including `feature-boundaries`, while conservatively preserving runtime and uncertain edges.
+- **Strict `tsconfig` Validation**: Detect broken `tsconfig.json` files or `extends` chains; strict CI fails rather than silently ignoring broken TypeScript configs.
+- **Compatibility**: Preserve baseline v1 and canonical JSON identity.
 
 
 ## [0.5.0] - 2026-09-23

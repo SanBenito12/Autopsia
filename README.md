@@ -1,7 +1,5 @@
 # 🔬 Autopsia
 
-> **0.6.0 — local release preparation, not published yet.** Commands using `@0.6.0` require publication. To test the local package see [the migration guide](docs/migration-0.6.md). The published version remains 0.5.0.
-
 [![CI](https://github.com/SanBenito12/Autopsia/actions/workflows/ci.yml/badge.svg)](https://github.com/SanBenito12/Autopsia/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/autopsia-rn)](https://www.npmjs.com/package/autopsia-rn)
 [![MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
@@ -16,19 +14,25 @@ Autopsia checks your TypeScript dependencies against configured layer rules. Rec
 
 ![Actual CLI output from the public sample fixture](https://raw.githubusercontent.com/SanBenito12/Autopsia/main/docs/demo.png)
 
-## Get a useful report
+## Quickstart (Zero-Friction Commands)
 
 Requires Node 18+. Run from your project root:
 
 ```bash
-npx autopsia-rn@0.6.0 init --preset react-native --dry-run
-# Review the proposal, then save it:
-npx autopsia-rn@0.6.0 init --preset react-native
-npx autopsia-rn@0.6.0 doctor .
-npx autopsia-rn@0.6.0 scan . --html --open
+# 1. Initialize configuration (auto-detects Expo Router, React Native, package.json libraries & features)
+npx autopsia-rn init
+
+# 2. View the interactive HTML graph with search, layer filters & clickable terminal link
+npx autopsia-rn view
+
+# 3. Watch for changes in real time during development
+npx autopsia-rn scan --watch
+
+# 4. Set up GitHub Actions CI in 1 second with inline Pull Request annotations
+npx autopsia-rn setup-ci
 ```
 
-Review the generated configuration and coverage first. `init` detects common layer names under `src/` and `src/features/*/`; other structures need manual patterns. If files are unclassified, adjust your config before relying on the report.
+[Expo Router Guide](docs/recipes/expo-router.md) · [Feature Boundaries Guide](docs/recipes/features-architecture.md)
 
 ## Adopt without fixing everything today
 
@@ -53,6 +57,7 @@ See new, resolved and persistent violations, including tolerated debt. Compariso
 
 | Rule | Example |
 |---|---|
+| `feature-boundaries` | Forbids importing private internals across features; enforces Public API (`index.ts`) |
 | `dependency-direction` | Domain importing a data implementation against its allowed dependencies |
 | `direct-data-access` | UI importing configured data clients such as axios or AsyncStorage |
 | `forbidden-external` | Domain importing React or another forbidden external package |
@@ -60,7 +65,7 @@ See new, resolved and persistent violations, including tolerated debt. Compariso
 
 Configure `error`, `warning` or `off` per rule. Document local exceptions with `// autopsia-ignore-next-line <rule> -- reason`. [Examples and fixes](https://github.com/SanBenito12/Autopsia/blob/main/docs/rules.md).
 
-The scanner follows imports, re-exports, `require()` and dynamic `import()`, resolves tsconfig aliases, and records source lines. Strict coverage distinguishes unclassified files, ambiguous layers and unresolved dependencies. Empty layers show `N/A`.
+The scanner follows imports, re-exports, `require()` and dynamic `import()`, resolves tsconfig aliases and React Native platform suffixes (`.ios`, `.android`, `.native`, `.web`), and records source lines. Strict coverage distinguishes unclassified files, ambiguous layers and unresolved dependencies. Empty layers show `N/A`.
 
 **Scope:** Autopsia verifies configured dependency rules, not overall architectural quality. Type-only imports are excluded from dependency rules. Direct data access checks configured module imports; it does not detect global `fetch()` calls. Excluded files and disabled rules are outside the checks.
 

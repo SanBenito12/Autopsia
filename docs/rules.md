@@ -100,6 +100,36 @@ Move shared behavior into a third module that neither imports its consumers nor 
 import { serialize } from './serializers';
 ```
 
+## feature-boundaries
+
+Enforces modular feature boundaries and protects Public API contracts.
+Files belonging to another feature (or outside features) cannot import private internal modules; they must import through the target feature's public entry point (`index.ts` or `public.ts`).
+
+```ts
+// Bad: accessing private internals across feature boundaries
+// src/features/checkout/screens/CheckoutScreen.tsx
+import { internalTokenHelper } from '../../auth/internal/token';
+
+// Good: importing via public API contract
+// src/features/checkout/screens/CheckoutScreen.tsx
+import { useAuth, AuthToken } from '../../auth';
+```
+
+Optional `allowedCrossImports` restricts which features can depend on each other:
+
+```json
+{
+  "features": {
+    "patterns": ["src/features/*", "features/*"],
+    "enforcePublicApi": true,
+    "allowedCrossImports": {
+      "checkout": ["auth", "catalog"],
+      "auth": []
+    }
+  }
+}
+```
+
 ## Ignore comments
 
 ```ts

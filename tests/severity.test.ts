@@ -78,6 +78,7 @@ describe('autopsia init genera la sección rules', () => {
       'direct-data-access': 'error',
       'forbidden-external': 'error',
       'circular-deps': 'error',
+      'feature-boundaries': 'error',
     });
   });
 

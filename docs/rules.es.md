@@ -249,6 +249,38 @@ import { serialize } from './serializers';
 
 ---
 
+## feature-boundaries
+
+Garantiza el aislamiento entre módulos o features e impone el uso de APIs Públicas (`index.ts`).
+Los archivos de una feature (o fuera de ellas) no pueden importar módulos internos o privados de otra feature; deben consumir el contrato expuesto en su punto de entrada (`index.ts` o `public.ts`).
+
+```ts
+// Mal: importando archivos internos y privados entre features
+// src/features/checkout/screens/CheckoutScreen.tsx
+import { internalTokenHelper } from '../../auth/internal/token';
+
+// Bien: consumiendo a través de la API pública
+// src/features/checkout/screens/CheckoutScreen.tsx
+import { useAuth, AuthToken } from '../../auth';
+```
+
+Opcionalmente, `allowedCrossImports` permite definir qué features pueden depender entre sí:
+
+```json
+{
+  "features": {
+    "patterns": ["src/features/*", "features/*"],
+    "enforcePublicApi": true,
+    "allowedCrossImports": {
+      "checkout": ["auth", "catalog"],
+      "auth": []
+    }
+  }
+}
+```
+
+---
+
 <a id="ignore-comments"></a>
 ## Comentarios de escape (referencia)
 

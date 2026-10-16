@@ -22,6 +22,17 @@ import { ScanResult } from './types';
 function violationEdges(result: ScanResult): string[] {
   const edges = new Set<string>();
   for (const v of result.violations) {
+    if (v.rule === 'feature-boundaries') {
+      const targetParam = v.diagnostic?.detail?.params?.p1 ?? v.diagnostic?.detail?.params?.p0;
+      if (typeof targetParam === 'string' && (v.diagnostic?.detail?.code === 'rule.import' || v.diagnostic?.detail?.params?.p1 !== undefined)) {
+        edges.add(`${v.file}|${targetParam}`);
+        continue;
+      }
+      if (v.detail?.startsWith('importa ')) {
+        edges.add(`${v.file}|${v.detail.slice('importa '.length)}`);
+        continue;
+      }
+    }
     if (!v.detail) continue;
     if (v.rule === 'dependency-direction' && v.detail.startsWith('importa ')) {
       edges.add(`${v.file}|${v.detail.slice('importa '.length)}`);
@@ -122,6 +133,52 @@ export function generateHtml(result: ScanResult): string {
   .legend .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
   .legend .line { width: 16px; height: 0; border-top: 2.5px solid var(--violation); flex: none; }
 
+  .graph-controls {
+    position: absolute; top: 12px; right: 12px;
+    display: flex; gap: 8px;
+  }
+  .btn-control {
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    color: var(--ink-2);
+    border: 1px solid var(--hairline);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .btn-control:hover { background: var(--surface-2); color: var(--ink); }
+
+  .filters {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .filters input[type="search"], .filters select {
+    width: 100%;
+    background: var(--surface-2);
+    color: var(--ink);
+    border: 1px solid var(--hairline);
+    border-radius: 6px;
+    padding: 6px 9px;
+    font-size: 12px;
+    outline: none;
+  }
+  .filters input[type="search"]:focus, .filters select:focus {
+    border-color: var(--ink-2);
+  }
+  .filters .toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    color: var(--ink-2);
+    cursor: pointer;
+    user-select: none;
+  }
+
   #tooltip {
     position: fixed;
     pointer-events: none;
@@ -198,8 +255,21 @@ export function generateHtml(result: ScanResult): string {
 <main>
   <div id="graph">
     <div class="legend" id="legend"></div>
+    <div class="graph-controls">
+      <button type="button" class="btn-control" id="reset-zoom">↺ ${escapeHtml(t("viewer.resetZoom"))}</button>
+    </div>
   </div>
   <aside>
+    <div class="filters">
+      <input type="search" id="search-input" placeholder="${escapeHtml(t("viewer.searchPlaceholder"))}" autocomplete="off">
+      <select id="layer-filter">
+        <option value="">${escapeHtml(t("viewer.allLayers"))}</option>
+      </select>
+      <label class="toggle-row">
+        <input type="checkbox" id="only-violations">
+        <span>${escapeHtml(t("viewer.onlyViolations"))}</span>
+      </label>
+    </div>
     <h2 id="panel-title"></h2>
     <div id="violations"></div>
   </aside>
@@ -367,7 +437,11 @@ function resize() {
 resize();
 window.addEventListener('resize', resize);
 
-svg.call(d3.zoom().scaleExtent([0.3, 5]).on('zoom', (e) => zoomLayer.attr('transform', e.transform)));
+const zoomBehavior = d3.zoom().scaleExtent([0.3, 5]).on('zoom', (e) => zoomLayer.attr('transform', e.transform));
+svg.call(zoomBehavior);
+document.getElementById('reset-zoom').addEventListener('click', () => {
+  svg.transition().duration(350).call(zoomBehavior.transform, d3.zoomIdentity);
+});
 
 node.call(d3.drag()
   .on('start', (e, d) => { if (!e.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
@@ -404,6 +478,84 @@ node
   })
   .on('mouseleave', () => { tooltip.style.opacity = '0'; });
 
+// ---- Filtros interactivos ----
+const layerFilterEl = document.getElementById('layer-filter');
+const searchInputEl = document.getElementById('search-input');
+const onlyViolationsEl = document.getElementById('only-violations');
+for (const l of layers) {
+  const opt = document.createElement('option');
+  opt.value = l;
+  opt.textContent = l;
+  layerFilterEl.append(opt);
+}
+if (nodes.some((n) => !n.layer)) {
+  const opt = document.createElement('option');
+  opt.value = '__unlayered__';
+  opt.textContent = ${JSON.stringify(t("viewer.unlayered"))};
+  layerFilterEl.append(opt);
+}
+
+const layerByFile = new Map(nodes.map((n) => [n.path, n.layer]));
+function matchesFilter(filePath) {
+  const query = searchInputEl.value.trim().toLowerCase();
+  const selectedLayer = layerFilterEl.value;
+  const onlyViols = onlyViolationsEl.checked;
+  const nodeLayer = layerByFile.get(filePath) ?? null;
+
+  if (query && !filePath.toLowerCase().includes(query)) return false;
+  if (selectedLayer === '__unlayered__' && nodeLayer !== null) return false;
+  if (selectedLayer && selectedLayer !== '__unlayered__' && nodeLayer !== selectedLayer) return false;
+  if (onlyViols && !violationsByFile.has(filePath)) return false;
+  return true;
+}
+
+function applyFilters() {
+  const hasActiveFilter =
+    searchInputEl.value.trim() !== '' ||
+    layerFilterEl.value !== '' ||
+    onlyViolationsEl.checked;
+
+  const matchedPaths = new Set(nodes.filter((d) => matchesFilter(d.path)).map((d) => d.path));
+
+  if (!hasActiveFilter) {
+    clearHighlight();
+  } else {
+    node
+      .attr('opacity', (d) => matchedPaths.has(d.path) ? 1 : 0.12)
+      .attr('r', (d) => matchedPaths.has(d.path) ? radiusOf(d) * 1.15 : radiusOf(d));
+    link.attr('opacity', (d) =>
+      matchedPaths.has(d.source.path ?? d.source) && matchedPaths.has(d.target.path ?? d.target)
+        ? 0.95
+        : matchedPaths.has(d.source.path ?? d.source) || matchedPaths.has(d.target.path ?? d.target)
+          ? 0.35
+          : 0.06
+    );
+  }
+
+  let visibleViolations = 0;
+  document.querySelectorAll('.rule-group').forEach((groupEl) => {
+    let groupCount = 0;
+    groupEl.querySelectorAll('.violation-item').forEach((itemEl) => {
+      const file = itemEl.getAttribute('data-file') || '';
+      const show = matchesFilter(file);
+      itemEl.style.display = show ? '' : 'none';
+      if (show) {
+        groupCount++;
+        visibleViolations++;
+      }
+    });
+    const countBadge = groupEl.querySelector('.count');
+    if (countBadge) countBadge.textContent = String(groupCount);
+    groupEl.style.display = groupCount > 0 ? '' : 'none';
+  });
+  document.getElementById('panel-title').textContent =
+    ${JSON.stringify(t("viewer.panel"))} + (hasActiveFilter ? visibleViolations : result.violations.length) + ')';
+}
+
+searchInputEl.addEventListener('input', applyFilters);
+layerFilterEl.addEventListener('change', applyFilters);
+onlyViolationsEl.addEventListener('change', applyFilters);
+
 // ---- Panel de violaciones agrupadas por regla ----
 function highlightNode(filePath) {
   node
@@ -424,8 +576,8 @@ function clearHighlight() {
   link.attr('opacity', 1);
 }
 svg.on('click', () => {
-  clearHighlight();
   document.querySelectorAll('.violation-item.active').forEach((el) => el.classList.remove('active'));
+  applyFilters();
 });
 
 const panel = document.getElementById('violations');
@@ -460,6 +612,7 @@ for (const [rule, violations] of byRule) {
   for (const v of violations) {
     const item = document.createElement('div');
     item.className = 'violation-item';
+    item.setAttribute('data-file', v.file);
     const file = document.createElement('div');
     file.className = 'file';
     file.textContent = v.file;
@@ -497,6 +650,8 @@ export function writeHtml(result: ScanResult, outPath: string): void {
   fs.mkdirSync(path.dirname(resolved), { recursive: true });
   fs.writeFileSync(resolved, generateHtml(result), 'utf-8');
   console.log(chalk.gray(t("viewer.saved", {p0: outPath})));
+  const fileUrl = `file://${resolved}`;
+  console.log(chalk.cyan(t("viewer.clickable", {p0: fileUrl})));
   console.log('');
 }
 

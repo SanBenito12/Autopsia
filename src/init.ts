@@ -31,6 +31,84 @@ const DEFAULT_DATA_ACCESS = [
   '@react-native-async-storage/async-storage',
 ];
 
+const KNOWN_DATA_ACCESS_PACKAGES: { pkg: string; domainPrefix: string }[] = [
+  { pkg: 'axios', domainPrefix: 'axios' },
+  { pkg: '@supabase/supabase-js', domainPrefix: '@supabase' },
+  { pkg: '@react-native-async-storage/async-storage', domainPrefix: '@react-native-async-storage' },
+  { pkg: 'react-native-mmkv', domainPrefix: 'react-native-mmkv' },
+  { pkg: 'expo-sqlite', domainPrefix: 'expo-sqlite' },
+  { pkg: 'expo-secure-store', domainPrefix: 'expo-secure-store' },
+  { pkg: '@apollo/client', domainPrefix: '@apollo' },
+  { pkg: 'graphql-request', domainPrefix: 'graphql-request' },
+  { pkg: 'ky', domainPrefix: 'ky' },
+  { pkg: '@trpc/client', domainPrefix: '@trpc' },
+  { pkg: 'firebase', domainPrefix: 'firebase' },
+  { pkg: '@react-native-firebase/app', domainPrefix: '@react-native-firebase' },
+  { pkg: '@react-native-firebase/firestore', domainPrefix: '@react-native-firebase' },
+  { pkg: '@react-native-firebase/auth', domainPrefix: '@react-native-firebase' },
+  { pkg: '@react-native-firebase/database', domainPrefix: '@react-native-firebase' },
+  { pkg: '@nozbe/watermelondb', domainPrefix: '@nozbe/watermelondb' },
+  { pkg: 'realm', domainPrefix: 'realm' },
+  { pkg: 'drizzle-orm', domainPrefix: 'drizzle-orm' },
+  { pkg: 'aws-amplify', domainPrefix: 'aws-amplify' },
+];
+
+/**
+ * Inspecciona package.json del proyecto (si existe) para detectar librerías reales
+ * de red, base de datos local o BaaS instaladas por el desarrollador.
+ */
+export function detectPackageJsonDataAccess(root?: string): {
+  dataAccessModules: string[];
+  domainForbidden: string[];
+} {
+  const dataAccess = new Set<string>(DEFAULT_DATA_ACCESS);
+  const domainForbidden = new Set<string>(DOMAIN_FORBIDDEN);
+
+  if (root) {
+    const pkgPath = path.join(root, 'package.json');
+    if (fs.existsSync(pkgPath)) {
+      try {
+        const raw = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+        const deps = {
+          ...(raw?.dependencies ?? {}),
+          ...(raw?.devDependencies ?? {}),
+        };
+        for (const item of KNOWN_DATA_ACCESS_PACKAGES) {
+          if (Object.prototype.hasOwnProperty.call(deps, item.pkg)) {
+            dataAccess.add(item.pkg);
+            domainForbidden.add(item.domainPrefix);
+          }
+        }
+      } catch {
+        // Ignorar package.json malformado y usar defaults
+      }
+    }
+  }
+
+  return {
+    dataAccessModules: [...dataAccess],
+    domainForbidden: [...domainForbidden],
+  };
+}
+
+/**
+ * Detecta carpetas de features o módulos (src/features/*, features/*, src/modules/*, modules/*)
+ * que tengan subcarpetas de features reales.
+ */
+export function detectFeaturesPatterns(root?: string): string[] {
+  if (!root) return [];
+  const candidates = ['src/features', 'features', 'src/modules', 'modules'];
+  const patterns: string[] = [];
+  for (const rel of candidates) {
+    const full = path.join(root, rel);
+    if (fs.existsSync(full) && fs.statSync(full).isDirectory()) {
+      const hasSubdirs = fs.readdirSync(full, { withFileTypes: true }).some((e) => e.isDirectory());
+      if (hasSubdirs) patterns.push(`${rel}/*`);
+    }
+  }
+  return patterns;
+}
+
 export interface DetectedLayer {
   /** Nombre canónico de la capa (presentation, domain, data, infrastructure) */
   name: string;
@@ -50,12 +128,14 @@ export function detectLayers(root: string): DetectedLayer[] {
 
   // Layer-first and one feature level: stop at the layer boundary so nested
   // folders such as domain/services do not become overlapping layers.
-  const featuresDir = path.join(srcDir, 'features');
-  if (fs.existsSync(featuresDir) && fs.statSync(featuresDir).isDirectory()) {
-    for (const feature of fs.readdirSync(featuresDir, { withFileTypes: true })) {
-      if (!feature.isDirectory()) continue;
-      for (const layer of fs.readdirSync(path.join(featuresDir, feature.name), { withFileTypes: true })) {
-        if (layer.isDirectory()) dirs.push(`features/${feature.name}/${layer.name}`);
+  for (const container of ['features', 'modules']) {
+    const featuresDir = path.join(srcDir, container);
+    if (fs.existsSync(featuresDir) && fs.statSync(featuresDir).isDirectory()) {
+      for (const feature of fs.readdirSync(featuresDir, { withFileTypes: true })) {
+        if (!feature.isDirectory()) continue;
+        for (const layer of fs.readdirSync(path.join(featuresDir, feature.name), { withFileTypes: true })) {
+          if (layer.isDirectory()) dirs.push(`${container}/${feature.name}/${layer.name}`);
+        }
       }
     }
   }
@@ -91,8 +171,9 @@ function allowedFor(layerName: string, detectedNames: Set<string>): string[] {
 }
 
 /** Construye la config a partir de las capas detectadas. */
-export function buildConfig(detected: DetectedLayer[]): AutopsiaConfig {
+export function buildConfig(detected: DetectedLayer[], root?: string): AutopsiaConfig {
   const detectedNames = new Set(detected.map((d) => d.name));
+  const { dataAccessModules, domainForbidden } = detectPackageJsonDataAccess(root);
 
   const layers: LayerConfig[] = detected.map((d) => {
     const layer: LayerConfig = {
@@ -100,28 +181,116 @@ export function buildConfig(detected: DetectedLayer[]): AutopsiaConfig {
       patterns: d.folders.map((f) => `src/${f}/*`),
       allowedDependencies: allowedFor(d.name, detectedNames),
     };
-    if (d.name === 'domain') layer.forbiddenExternal = [...DOMAIN_FORBIDDEN];
+    if (d.name === 'domain') layer.forbiddenExternal = [...domainForbidden];
     return layer;
   });
 
   const rules: Record<string, RuleLevel> = {};
   for (const rule of ALL_RULES) rules[rule] = 'error';
 
-  return {
+  const config: AutopsiaConfig = {
     layers,
-    dataAccessModules: [...DEFAULT_DATA_ACCESS],
+    dataAccessModules,
     noDirectDataAccessIn: detectedNames.has('presentation') ? ['presentation'] : [],
     rules,
     strict: true,
   };
+
+  const featurePatterns = detectFeaturesPatterns(root);
+  if (featurePatterns.length > 0) {
+    config.features = {
+      patterns: featurePatterns,
+      enforcePublicApi: true,
+    };
+  }
+
+  return config;
 }
 
 /** Config de ejemplo cuando no se detecta ninguna capa. */
-export function exampleConfig(): AutopsiaConfig {
-  return buildConfig(LAYER_CANDIDATES.map((c) => ({ name: c.name, folders: [c.folders[0]] })));
+export function exampleConfig(root?: string): AutopsiaConfig {
+  return buildConfig(
+    LAYER_CANDIDATES.map((c) => ({ name: c.name, folders: [c.folders[0]] })),
+    root
+  );
 }
 
-export interface InitOptions { preset?: 'react-native'; dryRun?: boolean }
+export interface InitOptions { preset?: 'react-native' | 'expo'; dryRun?: boolean }
+
+/** Genera configuración adaptada a Expo Router y estructuras por carpetas. */
+export function buildExpoConfig(root: string): AutopsiaConfig {
+  const hasSrc = fs.existsSync(path.join(root, 'src')) && fs.statSync(path.join(root, 'src')).isDirectory();
+  const baseDir = hasSrc && fs.existsSync(path.join(root, 'src', 'app')) ? 'src' : '';
+  const prefix = baseDir ? `${baseDir}/` : '';
+
+  const check = (name: string) => {
+    const p = path.join(root, prefix + name);
+    return fs.existsSync(p) && fs.statSync(p).isDirectory();
+  };
+
+  const layers: LayerConfig[] = [];
+  const addLayer = (name: string, folders: string[], allowed?: string[]) => {
+    const existing = folders.filter((f) => check(f));
+    if (existing.length > 0) {
+      layers.push({
+        name,
+        patterns: existing.map((f) => `${prefix}${f}/*`),
+        allowedDependencies: allowed,
+      });
+    }
+  };
+
+  addLayer('routes', ['app'], ['features', 'components', 'services', 'hooks', 'constants']);
+  addLayer('features', ['features', 'modules'], ['components', 'services', 'hooks', 'constants']);
+  addLayer('components', ['components'], ['hooks', 'constants']);
+  addLayer('services', ['services', 'api'], ['constants']);
+  addLayer('hooks', ['hooks'], ['constants']);
+  addLayer('constants', ['constants', 'utils']);
+
+  const layerNames = new Set(layers.map((l) => l.name));
+  for (const layer of layers) {
+    if (layer.allowedDependencies) {
+      layer.allowedDependencies = layer.allowedDependencies.filter((d) => layerNames.has(d));
+    }
+  }
+
+  const rules: Record<string, RuleLevel> = {};
+  for (const rule of ALL_RULES) rules[rule] = 'error';
+  const { dataAccessModules } = detectPackageJsonDataAccess(root);
+
+  const config: AutopsiaConfig = {
+    layers:
+      layers.length > 0
+        ? layers
+        : [
+            {
+              name: 'routes',
+              patterns: [`${prefix}app/*`],
+              allowedDependencies: ['components', 'services'],
+            },
+            { name: 'components', patterns: [`${prefix}components/*`] },
+            { name: 'services', patterns: [`${prefix}services/*`] },
+          ],
+    dataAccessModules,
+    noDirectDataAccessIn: ['routes', 'components'].filter((n) => layerNames.has(n)),
+    rules,
+    strict: true,
+  };
+
+  if (check('features')) {
+    config.features = {
+      patterns: [`${prefix}features/*`],
+      enforcePublicApi: true,
+    };
+  } else if (check('modules')) {
+    config.features = {
+      patterns: [`${prefix}modules/*`],
+      enforcePublicApi: true,
+    };
+  }
+
+  return config;
+}
 
 /** Explicit opt-in proposal; unknown shared folders never become a catch-all layer. */
 export function buildReactNativeConfig(root: string): AutopsiaConfig {
@@ -133,16 +302,29 @@ export function buildReactNativeConfig(root: string): AutopsiaConfig {
   };
   const children = (folder: string): string[] => fs.existsSync(folder) && fs.statSync(folder).isDirectory()
     ? fs.readdirSync(folder, { withFileTypes: true }).filter(e => e.isDirectory()).map(e => e.name).sort() : [];
-  const scopes = ['', ...children(path.join(root, 'src/features')).map(f => `features/${f}/`)];
+  const scopes = [
+    '',
+    ...children(path.join(root, 'src/features')).map(f => `features/${f}/`),
+    ...children(path.join(root, 'src/modules')).map(m => `modules/${m}/`),
+  ];
   for (const scope of scopes) {
-    if (children(path.join(root, 'src', scope)).includes('application')) add('application', `${scope}application`);
+    const scopeChildren = children(path.join(root, 'src', scope));
+    for (const appFolder of ['application', 'usecases', 'use-cases']) {
+      if (scopeChildren.includes(appFolder)) add('application', `${scope}${appFolder}`);
+    }
+    for (const uiFolder of ['components', 'hooks', 'navigation']) {
+      if (scopeChildren.includes(uiFolder)) add('presentation', `${scope}${uiFolder}`);
+    }
+    for (const infraFolder of ['api', 'clients', 'storage']) {
+      if (scopeChildren.includes(infraFolder)) add('infrastructure', `${scope}${infraFolder}`);
+    }
     for (const name of children(path.join(root, 'src', scope, 'shared'))) {
       if (['presentation', 'domain', 'data', 'infrastructure', 'application'].includes(name)) add(name, `${scope}shared/${name}`);
     }
   }
   for (const folder of ['app', 'di']) if (children(path.join(root, 'src')).includes(folder)) add('composition', folder);
   const hasApp = fs.existsSync(path.join(root, 'App.tsx')) && fs.statSync(path.join(root, 'App.tsx')).isFile();
-  const config = detected.length ? buildConfig(detected) : hasApp ? buildConfig([]) : exampleConfig();
+  const config = detected.length ? buildConfig(detected, root) : hasApp ? buildConfig([], root) : exampleConfig(root);
   if (hasApp) {
     const composition = config.layers.find(l => l.name === 'composition');
     if (composition) composition.files = ['App.tsx'];
@@ -198,7 +380,22 @@ export function initProject(root: string, force = false, options: InitOptions = 
     return { status: 'exists', configPath, detected };
   }
 
-  const config = options.preset ? buildReactNativeConfig(root) : detected.length > 0 ? buildConfig(detected) : exampleConfig();
+  const isExpo =
+    options.preset === 'expo' ||
+    (options.preset === undefined &&
+      detected.length === 0 &&
+      (fs.existsSync(path.join(root, 'app')) || fs.existsSync(path.join(root, 'src', 'app'))));
+
+  const config =
+    options.preset === 'react-native'
+      ? buildReactNativeConfig(root)
+      : isExpo
+      ? buildExpoConfig(root)
+      : detected.length > 0
+      ? buildConfig(detected, root)
+      : fs.existsSync(path.join(root, 'App.tsx'))
+      ? buildReactNativeConfig(root)
+      : exampleConfig(root);
   const example = !config.layers.some(layer => (layer.files ?? []).some(file => fs.existsSync(path.join(root, file))) ||
     (layer.patterns ?? []).some(pattern => fs.existsSync(path.join(root, pattern.replace(/\*$/, '')))));
   if (options.dryRun) return { status: 'preview', configPath, detected, config, example };

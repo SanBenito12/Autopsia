@@ -21,12 +21,23 @@ export interface LayerConfig {
 /** Nivel de una regla: error (default, falla --ci), warning (no falla) u off */
 export type RuleLevel = 'error' | 'warning' | 'off';
 
+export interface FeatureRuleConfig {
+  /** Patrones que identifican las carpetas de features (ej. ["src/features/*", "features/*"]) */
+  patterns?: string[];
+  /** Si true (default), exige importar a través del index.ts o API pública de la feature */
+  enforcePublicApi?: boolean;
+  /** Dependencias cruzadas permitidas entre features: { "cart": ["auth", "products"] } */
+  allowedCrossImports?: Record<string, string[]>;
+}
+
 export interface AutopsiaConfig {
   layers: LayerConfig[];
   /** Módulos externos que se consideran "acceso directo a datos/red" */
   dataAccessModules: string[];
   /** Capas donde el acceso directo a datos es violación (típicamente presentation) */
   noDirectDataAccessIn: string[];
+  /** Reglas de aislamiento entre features / módulos */
+  features?: FeatureRuleConfig;
   /** Carpetas a ignorar */
   ignore?: string[];
   /** Severidad por regla. Si se omite, todas corren como "error". */
