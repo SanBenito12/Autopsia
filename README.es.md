@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/SanBenito12/Autopsia/actions/workflows/ci.yml/badge.svg)](https://github.com/SanBenito12/Autopsia/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/autopsia-rn)](https://www.npmjs.com/package/autopsia-rn)
+[![MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 [English](README.md) · Español
 
@@ -11,32 +12,42 @@ Autopsia comprueba dependencias TypeScript contra reglas de capas configuradas. 
 
 [Demo interactiva](https://sanbenito12.github.io/Autopsia/report.es.html) · [Guía inicial](https://github.com/SanBenito12/Autopsia/blob/main/docs/getting-started.es.md)
 
-## Primer reporte
+## Inicio Rápido (Comandos Cero Fricción)
 
 Requiere Node 18+. Desde la raíz de tu proyecto:
 
 ```bash
-npx autopsia-rn@0.5.0 init --lang es
-npx autopsia-rn@0.5.0 scan . --lang es --html --open
+# 1. Inicializa tu configuración (autodetecta Expo Router, React Native, librerías en package.json y features)
+npx autopsia-rn init
+
+# 2. Abre el grafo interactivo HTML en tu navegador con buscador, filtros por capa y enlace clicable
+npx autopsia-rn view
+
+# 3. Observa cambios en tiempo real mientras programas
+npx autopsia-rn scan --watch
+
+# 4. Configura GitHub Actions en 1 segundo con anotaciones automáticas en tus Pull Requests
+npx autopsia-rn setup-ci
 ```
 
-Revisa la configuración y cobertura. `init` detecta nombres comunes bajo `src/` y `src/features/*/`; otras estructuras requieren patrones manuales.
+[Guía de Expo Router](docs/recipes/expo-router.es.md) · [Guía de Aislamiento de Features](docs/recipes/features-architecture.es.md)
 
 ## Adopta con deuda existente
 
 ```bash
-npx autopsia-rn@0.5.0 scan . --lang es --update-baseline
-npx autopsia-rn@0.5.0 scan . --lang es --ci
+npx autopsia-rn@0.6.0 scan --update-baseline
+npx autopsia-rn@0.6.0 scan --ci
 ```
 
 Commitea `autopsia.config.json` y `autopsia-baseline.json`. Los errores nuevos fallan CI; con `strict: true`, el análisis incompleto también falla. La deuda tolerada sigue visible. Nunca regeneres el baseline automáticamente en CI.
 
-Para medir una refactorización, guarda un JSON con `-o before.json` y después ejecuta `scan . --compare before.json --lang es`. La comparación incluye deuda tolerada y no cambia los criterios de CI.
+Para medir una refactorización, guarda un JSON con `-o before.json` y después ejecuta `scan . --compare before.json`. La comparación incluye deuda tolerada y no cambia los criterios de CI.
 
 ## Reglas y alcance
 
 | Regla | Detecta |
 |---|---|
+| `feature-boundaries` | Aislamiento de features; prohíbe importar submódulos privados entre features (obliga API pública `index.ts`) |
 | `dependency-direction` | Dependencias entre capas no permitidas |
 | `direct-data-access` | Imports de clientes de datos configurados desde capas restringidas |
 | `forbidden-external` | Paquetes externos prohibidos en una capa |
@@ -44,11 +55,11 @@ Para medir una refactorización, guarda un JSON con `-o before.json` y después 
 
 Cada regla acepta `error`, `warning` u `off`; las excepciones locales usan comentarios `autopsia-ignore`.
 
-Autopsia verifica dependencias según tu configuración; no certifica la calidad completa de la arquitectura. Los imports exclusivamente de tipos se excluyen de las reglas. Las llamadas globales a `fetch()` no se detectan. Los archivos ignorados quedan fuera de la cobertura.
+El escáner sigue imports, re-exports, `require()` e `import()` dinámico, resuelve aliases de `tsconfig` y sufijos de plataforma de React Native (`.ios`, `.android`, `.native`, `.web`), y registra las líneas de origen. Autopsia verifica dependencias según tu configuración; no certifica la calidad completa de la arquitectura. Los imports exclusivamente de tipos se excluyen de las reglas. Las llamadas globales a `fetch()` no se detectan. Los archivos ignorados quedan fuera de la cobertura.
 
 ## Idiomas y compatibilidad
 
-0.5 usa inglés por defecto. `--lang es` cambia terminal y HTML y funciona antes o después del subcomando. El JSON conserva `message` y `detail` canónicos en español y añade metadatos opcionales `diagnostic`. Los baselines v1 de 0.4 siguen funcionando; los reportes antiguos sin metadatos muestran su texto original.
+Desde 0.5, inglés es el idioma por defecto. `--lang es` cambia terminal y HTML y funciona antes o después del subcomando. El JSON conserva `message` y `detail` canónicos en español y añade metadatos opcionales `diagnostic`. Los baselines v1 de 0.4 siguen funcionando; los reportes antiguos sin metadatos muestran su texto original.
 
 ## Evidencia reproducible
 
@@ -68,3 +79,13 @@ El mantenedor reportó anteriormente 25 hallazgos en menos de dos segundos sobre
 Cuéntanos cuánto tardaste en obtener un reporte útil y qué hallazgos no te parecen correctos mediante un [issue](https://github.com/SanBenito12/Autopsia/issues).
 
 MIT © Salvador Castillo.
+
+## Diagnosticar antes de aceptar deuda
+
+`doctor` explica preparación y cobertura: archivos sin capa, coincidencias ambiguas, imports internos sin resolver y problemas al cargar `tsconfig` o sus `extends`. No modifica el proyecto ni comprueba las cuatro reglas: para eso ejecuta `scan`. Guarda todas las incidencias con `doctor . --output doctor.json`; la consola muestra hasta diez.
+
+El preset `react-native` es optativo. Propone `application`, composición (`src/app`, `src/di`, `App.tsx`) y subcarpetas inequívocas de `shared`. No asigna una capa comodín a carpetas ambiguas. Revisa las direcciones permitidas y completa pendientes con ayuda de `doctor`. `--dry-run` nunca escribe, incluso con `--force`.
+
+La exclusión de tipos ahora reconoce imports ordinarios cuyos símbolos TypeScript resuelve exclusivamente como tipos, incluidos alias y reexportaciones con nombres. Imports mixtos, clases, enums, namespaces, reexportaciones `export *`, efectos secundarios y símbolos inciertos conservan aristas. No sustituye el análisis del bundle de Metro.
+
+[Configuración](docs/configuration.es.md) · [Migración 0.5 → 0.6](docs/migration-0.6.es.md)

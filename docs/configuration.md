@@ -1,8 +1,10 @@
 # Configuration
 
+> Guide for the local 0.6.0 preparation, not yet published. [Local installation and migration](migration-0.6.md).
+
 English · [Español](configuration.es.md)
 
-`autopsia.config.json` lives in the scanned project root. Generate it with `npx autopsia-rn@0.5.0 init`, then review it against your actual architecture.
+`autopsia.config.json` lives in the scanned project root. Generate it with `npx autopsia-rn@0.6.0 init`, then review it against your actual architecture.
 
 ```json
 {
@@ -78,3 +80,35 @@ Each rule accepts `error` (fails CI for new violations), `warning` (reported wit
 | `--tsconfig <file>` | Explicit tsconfig for path aliases; defaults to the scanned root's tsconfig. |
 
 `scan` defaults to the current directory. `init --force` overwrites an existing configuration. Language never changes JSON identity fields or baseline matching. Optional diagnostic metadata is additive; old report text remains displayable.
+
+## Reviewable preset and exact paths
+
+`init --preset react-native --dry-run` previews the proposal without writing; omit `--dry-run` to create it. Without `--preset`, previous detection remains available. Neither mode overwrites without `--force`.
+
+| Layer | allowedDependencies |
+|---|---|
+| presentation | application, domain |
+| application | domain |
+| data | infrastructure, domain |
+| infrastructure | domain |
+| domain | [] |
+| composition | All other detected layers |
+
+Only present target layers are included. The preset adds `src/application`, `src/features/*/application`, `src/app`, `src/di` and the root `App.tsx`. Under `src/shared` and `src/features/*/shared`, only `presentation`, `application`, `domain`, `data` and `infrastructure` subfolders are recognized. Ambiguous folders such as `utils`, `context`, `store` and `config` remain pending; inter-feature boundaries are not inferred.
+
+```json
+{ "name": "composition", "files": ["App.tsx"], "patterns": ["src/app/*", "src/di/*"], "allowedDependencies": ["presentation", "domain"] }
+```
+
+`files` is optional: exact paths relative to the root, case-sensitive and using `/`. Absolute paths, wildcards, empty segments, `.` and `..` are rejected. A layer needs at least one entry in `patterns` or `files`; both can be combined. `files: ["App.tsx"]` does not match `src/App.tsx`. Patterns retain their previous semantics. Matches across different layers remain ambiguous, whether exact or pattern-based.
+
+## doctor
+
+```bash
+npx autopsia-rn@0.6.0 doctor . --lang es --output doctor.json
+npx autopsia-rn@0.6.0 doctor . --config autopsia.config.json --tsconfig tsconfig.json
+```
+
+Accepts `[path]`, `-c/--config`, `--tsconfig`, `-o/--output` and `--lang en|es` before or after the subcommand. `0`: ready without blockers; `1`: incomplete readiness/coverage; `2`: invalid arguments, malformed configuration or execution failure.
+
+Stable JSON uses `schemaVersion: 1`, `status` (`ready`, `incomplete`, `error`), configuration paths, `typescriptVersion`, `totalFiles`, `coverage` (null when unavailable), `detected` and `issues`. Each issue contains `code`, canonical message, recommendation, translation metadata and location when available. Ambiguities include `matches` with layer, patterns and exact files. Language changes only terminal presentation, not JSON. Recommendations are never applied automatically.

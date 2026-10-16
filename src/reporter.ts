@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import { AnalysisIssue, AnalysisIssueKind, ScanResult, Violation } from './types';
 
 const issueLabels = (): Record<AnalysisIssueKind, string> => ({
+  'tsconfig-error': 'tsconfig',
   'empty-project': t("report.empty", {}),
   'unanalyzable-import': t("report.unanalyzable", {}),
   'unclassified-file': t("report.unclassified", {}),
@@ -23,6 +24,7 @@ function formatPercent(value: number): string {
 
 function printIssueGroups(issues: AnalysisIssue[]): void {
   const order: AnalysisIssueKind[] = [
+    'tsconfig-error',
     'empty-project',
     'unanalyzable-import',
     'unclassified-file',
@@ -37,6 +39,7 @@ function printIssueGroups(issues: AnalysisIssue[]): void {
     for (const issue of group.slice(0, 5)) {
       const location = issue.file ? `${issue.file}${issue.line ? `:${issue.line}` : ''}` : '';
       console.log(`      ${location ? chalk.cyan(location) + ' · ' : ''}${present(issue).message}`);
+      if (kind === 'tsconfig-error') { console.log(`      ${issue.detail ?? ''}`); console.log(`      ${t('doctor.tsconfigFix')}`); }
     }
     if (group.length > 5) console.log(chalk.gray(t("report.more", {p0: group.length - 5})));
   }
@@ -194,4 +197,47 @@ export function writeJson(result: ScanResult, outPath: string): void {
   fs.writeFileSync(outPath, JSON.stringify(result, null, 2), 'utf-8');
   console.log(chalk.gray(t("report.json", {p0: outPath})));
   console.log('');
+}
+
+export function printGitHubAnnotations(violations: Violation[]): void {
+  for (const v of violations) {
+    const level = v.severity === 'warning' ? 'warning' : 'error';
+    const line = v.line ?? 1;
+    const msg = present(v).message + (v.detail ? ` — ${present(v).detail}` : '');
+    console.log(`::${level} file=${v.file},line=${line},title=Autopsia: ${v.rule}::${msg}`);
+  }
+}
+
+export function writeGitHubSummary(result: ScanResult): void {
+  const summaryFile = process.env.GITHUB_STEP_SUMMARY;
+  if (!summaryFile) return;
+  try {
+    const coverage = analysisCoveragePercent(result);
+    const healthRows = Object.entries(result.healthByLayer)
+      .map(([layer, score]) => `| \`${layer}\` | ${score}% |`)
+      .join('\n');
+
+    let md = `## 🔬 Autopsia Architecture Report\n\n`;
+    md += `| Metric | Value |\n| :--- | :--- |\n`;
+    md += `| **Files Scanned** | ${result.totalFiles} |\n`;
+    md += `| **Architectural Coverage** | ${coverage}% |\n`;
+    md += `| **New Violations** | ${result.violations.length === 0 ? '✅ 0' : `❌ ${result.violations.length}`} |\n`;
+    if (result.tolerated && result.tolerated.length > 0) {
+      md += `| **Tolerated Baseline Debt** | ⊘ ${result.tolerated.length} |\n`;
+    }
+    md += `\n### Layer Health\n| Layer | Health Score |\n| :--- | :--- |\n${healthRows}\n\n`;
+
+    if (result.violations.length > 0) {
+      md += `### Violations Found\n| Rule | File | Message |\n| :--- | :--- | :--- |\n`;
+      for (const v of result.violations.slice(0, 20)) {
+        md += `| \`${v.rule}\` | \`${v.file}${v.line ? `:${v.line}` : ''}\` | ${present(v).message} |\n`;
+      }
+      if (result.violations.length > 20) {
+        md += `\n*... and ${result.violations.length - 20} more violations.*\n`;
+      }
+    }
+    fs.appendFileSync(summaryFile, md + '\n', 'utf-8');
+  } catch {
+    // Non-fatal if step summary is not accessible
+  }
 }

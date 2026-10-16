@@ -14,22 +14,31 @@ Autopsia checks your TypeScript dependencies against configured layer rules. Rec
 
 ![Actual CLI output from the public sample fixture](https://raw.githubusercontent.com/SanBenito12/Autopsia/main/docs/demo.png)
 
-## Get a useful report
+## Quickstart (Zero-Friction Commands)
 
 Requires Node 18+. Run from your project root:
 
 ```bash
-npx autopsia-rn@0.5.0 init
-npx autopsia-rn@0.5.0 scan . --html --open
+# 1. Initialize configuration (auto-detects Expo Router, React Native, package.json libraries & features)
+npx autopsia-rn init
+
+# 2. View the interactive HTML graph with search, layer filters & clickable terminal link
+npx autopsia-rn view
+
+# 3. Watch for changes in real time during development
+npx autopsia-rn scan --watch
+
+# 4. Set up GitHub Actions CI in 1 second with inline Pull Request annotations
+npx autopsia-rn setup-ci
 ```
 
-Review the generated configuration and coverage first. `init` detects common layer names under `src/` and `src/features/*/`; other structures need manual patterns. If files are unclassified, adjust your config before relying on the report.
+[Expo Router Guide](docs/recipes/expo-router.md) · [Feature Boundaries Guide](docs/recipes/features-architecture.md)
 
 ## Adopt without fixing everything today
 
 ```bash
-npx autopsia-rn@0.5.0 scan . --update-baseline
-npx autopsia-rn@0.5.0 scan . --ci
+npx autopsia-rn@0.6.0 scan . --update-baseline
+npx autopsia-rn@0.6.0 scan . --ci
 ```
 
 Commit `autopsia.config.json` and `autopsia-baseline.json`. Existing debt stays visible; **new error-level violations fail CI**. In strict mode, incomplete analysis also fails. Never regenerate the baseline automatically in CI.
@@ -37,9 +46,9 @@ Commit `autopsia.config.json` and `autopsia-baseline.json`. Existing debt stays 
 After a refactor, compare your progress:
 
 ```bash
-npx autopsia-rn@0.5.0 scan . -o before.json
+npx autopsia-rn@0.6.0 scan . -o before.json
 # Refactor, then:
-npx autopsia-rn@0.5.0 scan . --compare before.json
+npx autopsia-rn@0.6.0 scan . --compare before.json
 ```
 
 See new, resolved and persistent violations, including tolerated debt. Comparison is informational; baseline and CI rules still decide whether a build passes.
@@ -48,6 +57,7 @@ See new, resolved and persistent violations, including tolerated debt. Compariso
 
 | Rule | Example |
 |---|---|
+| `feature-boundaries` | Forbids importing private internals across features; enforces Public API (`index.ts`) |
 | `dependency-direction` | Domain importing a data implementation against its allowed dependencies |
 | `direct-data-access` | UI importing configured data clients such as axios or AsyncStorage |
 | `forbidden-external` | Domain importing React or another forbidden external package |
@@ -55,16 +65,16 @@ See new, resolved and persistent violations, including tolerated debt. Compariso
 
 Configure `error`, `warning` or `off` per rule. Document local exceptions with `// autopsia-ignore-next-line <rule> -- reason`. [Examples and fixes](https://github.com/SanBenito12/Autopsia/blob/main/docs/rules.md).
 
-The scanner follows imports, re-exports, `require()` and dynamic `import()`, resolves tsconfig aliases, and records source lines. Strict coverage distinguishes unclassified files, ambiguous layers and unresolved dependencies. Empty layers show `N/A`.
+The scanner follows imports, re-exports, `require()` and dynamic `import()`, resolves tsconfig aliases and React Native platform suffixes (`.ios`, `.android`, `.native`, `.web`), and records source lines. Strict coverage distinguishes unclassified files, ambiguous layers and unresolved dependencies. Empty layers show `N/A`.
 
 **Scope:** Autopsia verifies configured dependency rules, not overall architectural quality. Type-only imports are excluded from dependency rules. Direct data access checks configured module imports; it does not detect global `fetch()` calls. Excluded files and disabled rules are outside the checks.
 
 ## English and Spanish
 
-English is the default in 0.5. For Spanish terminal output and HTML:
+English has been the default since 0.5. For Spanish terminal output and HTML:
 
 ```bash
-npx autopsia-rn@0.5.0 scan . --lang es --html --open
+npx autopsia-rn@0.6.0 scan . --lang es --html --open
 ```
 
 `--lang en|es` works before or after `scan` and `init`. Existing 0.4 baselines remain compatible. JSON retains canonical Spanish `message`/`detail` fields with optional diagnostic metadata; changing presentation language never introduces new debt. Older reports without metadata display their original text.
@@ -76,7 +86,7 @@ steps:
   - uses: actions/checkout@v4
   - uses: actions/setup-node@v4
     with: { node-version: 22 }
-  - run: npx --yes autopsia-rn@0.5.0 scan . --ci
+  - run: npx --yes autopsia-rn@0.6.0 scan . --ci
 ```
 
 Commit your config and baseline first. [Full workflow with HTML artifacts](https://github.com/SanBenito12/Autopsia/blob/main/docs/ci.md).
@@ -103,3 +113,13 @@ The maintainer previously reported 25 findings in under two seconds on one produ
 Trying Autopsia on your app? [Open an issue](https://github.com/SanBenito12/Autopsia/issues) with your folder structure, time to first useful report and any findings you disagree with. Remove private code and secrets from examples.
 
 MIT © Salvador Castillo. Built with TypeScript, ts-morph, commander and D3.
+
+## Diagnose before accepting debt
+
+`doctor` explains readiness and coverage: unclassified files, ambiguous matches, unresolved internal imports and failures loading `tsconfig` or its `extends` chain. It does not modify the project or evaluate the four dependency rules: use `scan` for those. Save all issues with `doctor . --output doctor.json`; the terminal shows up to ten.
+
+The `react-native` preset is opt-in. It proposes `application`, composition (`src/app`, `src/di`, `App.tsx`) and unambiguous layer subfolders of `shared`. It never assigns a catch-all layer to ambiguous folders. Review allowed directions and resolve remaining gaps with `doctor`. `--dry-run` never writes, even with `--force`.
+
+Type exclusion now recognizes ordinary imports whose TypeScript symbols resolve exclusively to types, including aliases and named reexports. Mixed imports, classes, enums, namespaces, `export *`, side effects and uncertain symbols retain edges. This does not reproduce Metro's bundling transformations.
+
+[Configuration](docs/configuration.md) · [Migration 0.5 → 0.6](docs/migration-0.6.md)

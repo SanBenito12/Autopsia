@@ -25,8 +25,10 @@ The fixture helpers illustrate a dependency cycle and have no production behavio
 
 Expected result: **5 → 4 violations, 1 resolved, 0 new, 4 persistent**; coverage remains 100%. The remaining violations are intentional.
 
-The script regenerates the offline reports in English and Spanish plus [before](demo-output.txt) and [after](demo-after.txt) terminal transcripts. The screenshots shown in the README come from this public fixture.
+The script regenerates the offline reports in English and Spanish plus [doctor](demo-doctor.txt), [before](demo-output.txt) and [after](demo-after.txt) terminal transcripts. The screenshots shown in the README come from this public fixture.
 
 ## Español
 
 Ejecuta los mismos comandos para reproducir el ejemplo público. El script trabaja en una copia temporal, rompe el ciclo entre helpers y compara los reportes reales: **5 → 4 violaciones, 1 resuelta, 0 nuevas**. El fixture original no cambia. Los helpers no representan lógica de producción; el ejemplo demuestra cómo quitar una dependencia y medir el resultado.
+
+The local 0.6 demo also runs `doctor`: the fixture is ready for analysis, although its five intentional rule violations remain. The [CLI preview](cli-preview.html) combines the actual doctor transcript and a labeled scan excerpt.

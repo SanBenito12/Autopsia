@@ -12,11 +12,16 @@ function patternToRegex(pattern: string): RegExp {
   return new RegExp(escaped, 'i');
 }
 
-export function matchingLayers(relPath: string, config: AutopsiaConfig): string[] {
+export function matchingEvidence(relPath: string, config: AutopsiaConfig): { layer: string; patterns: string[]; files: string[] }[] {
   const normalized = relPath.replace(/\\/g, '/');
-  return config.layers
-    .filter((layer) => layer.patterns.some((pattern) => patternToRegex(pattern).test(normalized)))
-    .map((layer) => layer.name);
+  return config.layers.map(layer => ({ layer: layer.name,
+    patterns: (layer.patterns ?? []).filter(pattern => patternToRegex(pattern).test(normalized)),
+    files: (layer.files ?? []).filter(file => file === normalized),
+  })).filter(match => match.patterns.length > 0 || match.files.length > 0);
+}
+
+export function matchingLayers(relPath: string, config: AutopsiaConfig): string[] {
+  return matchingEvidence(relPath, config).map(match => match.layer);
 }
 
 export function classifyFile(relPath: string, config: AutopsiaConfig): string | null {

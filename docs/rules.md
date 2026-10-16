@@ -1,5 +1,7 @@
 # Rules
 
+> Guide for the local 0.6.0 preparation, not yet published. [Local installation and migration](migration-0.6.md).
+
 English · [Español](rules.es.md)
 
 Autopsia checks four dependency rules. Configure each as `error`, `warning` or `off`. Type-only imports are excluded from dependency rules; this is a tool boundary, not a claim that types cannot create design coupling. Re-exports form graph edges and are checked too.
@@ -98,6 +100,36 @@ Move shared behavior into a third module that neither imports its consumers nor 
 import { serialize } from './serializers';
 ```
 
+## feature-boundaries
+
+Enforces modular feature boundaries and protects Public API contracts.
+Files belonging to another feature (or outside features) cannot import private internal modules; they must import through the target feature's public entry point (`index.ts` or `public.ts`).
+
+```ts
+// Bad: accessing private internals across feature boundaries
+// src/features/checkout/screens/CheckoutScreen.tsx
+import { internalTokenHelper } from '../../auth/internal/token';
+
+// Good: importing via public API contract
+// src/features/checkout/screens/CheckoutScreen.tsx
+import { useAuth, AuthToken } from '../../auth';
+```
+
+Optional `allowedCrossImports` restricts which features can depend on each other:
+
+```json
+{
+  "features": {
+    "patterns": ["src/features/*", "features/*"],
+    "enforcePublicApi": true,
+    "allowedCrossImports": {
+      "checkout": ["auth", "catalog"],
+      "auth": []
+    }
+  }
+}
+```
+
 ## Ignore comments
 
 ```ts
@@ -113,3 +145,9 @@ Place file directives near the top. Omitting the rule suppresses all rules for t
 | Intentional local exception | A named ignore comment with a reason |
 | Rule being introduced gradually | `warning` in [configuration](configuration.md) |
 | Rule does not apply | `off` in configuration |
+
+## Types and evidence in 0.6
+
+Explicit type imports and ordinary bindings resolved exclusively to interfaces or type aliases are excluded. Aliases and named reexports are followed. If a declaration mixes types and values, its complete edge remains. Classes, enums, namespaces, `export *`, side-effect imports and uncertain symbols retain dependencies.
+
+This may resolve apparent cycles from previous versions. Evidence remains in JSON as `typeOnly`; dependency rules and runtime graph exclude it. Your code is never rewritten, and this does not reproduce every Metro transformation.

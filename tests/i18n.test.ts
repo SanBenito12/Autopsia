@@ -34,6 +34,15 @@ describe('localized presentation and v0.4 compatibility', () => {
       expect(slots(en[key]), key).toEqual(slots(es[key]));
     }
   });
+  it('preserves 0.5 report identities and additional occurrence detection', () => {
+    const old: ScanResult = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures/v0.5-report.json'), 'utf8'));
+    const { graph, config } = loadGraph(SAMPLE_APP);
+    const current = runRules(graph, config);
+    expect(current.map(toEntry)).toEqual(old.violations.map(toEntry));
+    const baseline = { version: 1 as const, updatedAt: '', violations: old.violations.map(toEntry) };
+    expect(applyBaseline(current, baseline).fresh).toHaveLength(0);
+    expect(applyBaseline([...current, current[0]], baseline).fresh).toHaveLength(1);
+  });
   it('matches actual 0.4 report identities, preserves duplicates, and keeps legacy display text', () => {
     const { graph, config } = loadGraph(SAMPLE_APP);
     const violations = runRules(graph, config);

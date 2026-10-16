@@ -20,6 +20,18 @@ try {
   const cli = path.join(installed, 'dist', 'index.js');
   const run = (args) => spawnSync(process.execPath, [cli, ...args], { cwd: temp, encoding: 'utf8' });
   assert.equal(run(['--version']).stdout.trim(), require('../package.json').version);
+  const app = path.join(temp, 'app');
+  fs.mkdirSync(app); fs.writeFileSync(path.join(app, 'App.tsx'), 'export const App = 1;');
+  for (const language of ['en', 'es']) {
+    assert.equal(run(['init', app, '--preset', 'react-native', '--dry-run', '--lang', language]).status, 0);
+    assert.equal(fs.existsSync(path.join(app, 'autopsia.config.json')), false);
+  }
+  assert.equal(run(['init', app, '--preset', 'react-native']).status, 0);
+  for (const language of ['en', 'es']) {
+    const result = run(['doctor', app, '--lang', language]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, language === 'en' ? /Ready:/ : /Listo:/);
+  }
   const report = path.join(temp, 'report.html');
   const result = run(['scan', path.join(root, 'fixtures', 'sample-app'), '--ci', '--html', report]);
   assert.equal(result.status, 1, result.stderr);

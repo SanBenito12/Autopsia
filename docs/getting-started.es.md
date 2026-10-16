@@ -1,164 +1,82 @@
+# Primeros pasos
+
 [English](getting-started.md) · Español
 
-# Getting started
+> Guía de la 0.6.0 local, aún sin publicar. [Instalación local y migración](migration-0.6.es.md).
 
-Esta guía te lleva de cero a tener Autopsia corriendo en tu proyecto, sin asumir que conoces la herramienta ni Clean Architecture. Si algo no funciona como se muestra aquí, [abre un issue](https://github.com/SanBenito12/Autopsia/issues).
-
-**Requisitos:** Node 18 o superior. Nada más — todos los comandos usan `npx`, sin instalar nada globalmente.
+Evita nuevas violaciones sin arreglar toda la deuda heredada primero. Requiere Node 18 o superior. Ejecuta los comandos desde la raíz del proyecto.
 
 <a id="what-is-clean-architecture"></a>
 ## ¿Qué es Clean Architecture?
 
-Es una forma de organizar el código en **capas**, donde cada capa solo puede depender de las capas "de adentro". En una app React Native típica:
+Organiza el código en capas con direcciones de dependencia explícitas. Una configuración habitual es:
 
-```
-┌──────────────────────────────┐
-│        presentation          │   pantallas, componentes, hooks de UI
-│    (todo lo que ve React)    │
-└──────────────┬───────────────┘
-               │  solo puede importar de ↓
-┌──────────────▼───────────────┐
-│           domain             │   entidades y casos de uso
-│     (TypeScript puro:        │   NO sabe que React ni axios existen
-│   las reglas del negocio)    │
-└──────────────▲───────────────┘
-               │  implementa los contratos de ↑
-┌──────────────┴───────────────┐
-│      data / infrastructure   │   repositorios y clientes: hablan con
-│   (la única capa que toca    │   la API, Supabase, AsyncStorage…
-│      la red y el storage)    │
-└──────────────────────────────┘
+```text
+presentation → domain ← data
+                  ↑       ↓
+             infrastructure
 ```
 
-La regla de oro: **las flechas apuntan hacia adentro**. Una pantalla llama a un caso de uso; el caso de uso usa un repositorio; el repositorio habla con la red. Cuando una pantalla se salta todo y llama `axios.get()` directo, la app sigue funcionando… pero ya no puedes testear la pantalla sin red, ni cambiar de API sin tocar la UI. Autopsia detecta exactamente esos saltos.
+La interfaz usa contratos y casos de uso del dominio. Datos e infraestructura implementan esos contratos. El dominio no importa React ni clientes de red. Son límites configurables, no una evaluación de todos los aspectos del diseño del software.
 
-## Paso 1 — Genera tu config
-
-Desde la raíz de tu proyecto:
+## 1. Previsualiza y revisa la configuración
 
 ```bash
-npx autopsia-rn --lang es init
+npx autopsia-rn@0.6.0 init --preset react-native --dry-run --lang es
+# Revisa la propuesta y después guárdala:
+npx autopsia-rn@0.6.0 init --preset react-native --lang es
 ```
 
-`init` busca bajo `src/` carpetas con nombres típicos de cada capa (`presentation`, `ui`, `screens`, `views`, `domain`, `core`, `data`, `repositories`, `infrastructure`, `services`…) y genera `autopsia.config.json`:
+Autopsia reconoce nombres comunes bajo `src/` y `src/features/<feature>/`. El preset optativo añade application/composición y subcarpetas inequívocas de shared. Las carpetas ambiguas quedan pendientes. Omite `--preset` para conservar el detector anterior. Sin una estructura reconocible, genera un ejemplo que debes adaptar.
 
-```
-  Analizando estructura de /tu/proyecto ...
+Revisa `patterns`, `files`, `allowedDependencies` y `dataAccessModules`. Conserva tu configuración existente salvo que quieras reemplazarla deliberadamente con `--force`. La previsualización nunca escribe, incluso con `--force`.
 
-  ✔ Capas detectadas:
-    presentation     ← src/presentation
-    domain           ← src/domain
-    data             ← src/data
-    infrastructure   ← src/infrastructure
-
-  Config generado en /tu/proyecto/autopsia.config.json
-  Sección "rules": cada regla acepta "error" (falla --ci),
-  "warning" (se reporta en amarillo, no falla) u "off" (no corre).
-  Pruébalo con: autopsia scan /tu/proyecto
-```
-
-Si tu estructura no usa esos nombres, `init` genera un config de **ejemplo** y te avisa. Solo tienes que ajustar los `patterns` de cada capa a tus carpetas reales — la [guía de configuración](configuration.es.md) muestra cómo, incluyendo estructuras no estándar.
-
-## Paso 2 — Escanea
+## 2. Comprueba la preparación
 
 ```bash
-npx autopsia-rn --lang es scan .
+npx autopsia-rn@0.6.0 doctor . --lang es --output doctor.json
 ```
 
-Salida real sobre el proyecto de ejemplo del repo:
+Doctor explica archivos sin clasificar, coincidencias ambiguas, imports internos sin resolver y fallos de carga de tsconfig. No modifica el proyecto ni evalúa las reglas de dependencias: para eso ejecuta scan. El JSON contiene todas las incidencias; la consola muestra hasta diez.
 
-```
-  🔬 AUTOPSIA — Reporte de arquitectura
-  /tu/proyecto · 8 archivos analizados
+Una cobertura baja indica trabajo pendiente en la configuración. El baseline no perdona archivos sin capa, patrones ambiguos, dependencias internas sin resolver ni imports calculados en CI estricto. Consulta [configuración](configuration.es.md).
 
-  Salud por capa
-  presentation     ██████████░░░░░░░░░░ 50% (4 archivos)
-  domain           ██████████░░░░░░░░░░ 50% (2 archivos)
-  data             ████████████████████ 100% (1 archivos)
-  infrastructure   ████████████████████ 100% (1 archivos)
-
-  ✖ dependency-direction — 2 violación(es)
-    src/domain/usecases/GetEventsUseCase.ts
-      Capa "domain" no puede depender de "data"
-      ↳ importa src/data/repositories/EventRepository.ts
-    src/presentation/screens/HomeScreen.tsx
-      Capa "presentation" no puede depender de "data"
-      ↳ importa src/data/repositories/EventRepository.ts
-
-  ✖ direct-data-access — 1 violación(es)
-    src/presentation/screens/HomeScreen.tsx
-      Acceso directo a datos/red ("axios") en capa "presentation"
-      ↳ Debe pasar por un repositorio o caso de uso
-
-  ✖ forbidden-external — 1 violación(es)
-    src/domain/usecases/GetEventsUseCase.ts
-      Capa "domain" importa módulo prohibido "axios"
-      ↳ La capa debe mantenerse libre de "axios"
-
-  ✖ circular-deps — 1 violación(es)
-    src/presentation/screens/helperA.ts
-      Dependencia circular detectada (2 archivos)
-      ↳ src/presentation/screens/helperA.ts → src/presentation/screens/helperB.ts → src/presentation/screens/helperA.ts
-
-  Top archivos problemáticos
-     2  src/domain/usecases/GetEventsUseCase.ts
-     2  src/presentation/screens/HomeScreen.tsx
-
-  Total: 5 violaciones en 3 archivos
-
-  Tip: agrega --html --open para ver el grafo interactivo
-```
-
-Cómo leerlo:
-
-- **Salud por capa**: porcentaje de archivos de la capa sin violaciones. Es tu métrica de progreso entre scans.
-- **Cada violación** dice el archivo, qué regla rompió y el import exacto que la causó (`↳`). Qué significa cada regla y cómo arreglarla: [guía de reglas](rules.es.md).
-- **Top archivos problemáticos**: por dónde empezar — arreglar los archivos con más violaciones rinde más.
-
-Si tu proyecto usa path aliases (`@/domain/...`), Autopsia usa el `tsconfig.json` de la raíz escaneada automáticamente; si el tuyo está en otra parte: `--tsconfig ./tsconfig.app.json`.
-
-## Paso 3 — El grafo interactivo
+## 3. Analiza las dependencias
 
 ```bash
-npx autopsia-rn --lang es scan . --html --open
+npx autopsia-rn@0.6.0 scan . --lang es
+npx autopsia-rn@0.6.0 scan . --lang es --html --open
 ```
 
-Genera `autopsia-report.html` (autocontenido, lo puedes compartir o subir a tu CI como artifact) y lo abre en el navegador: cada nodo es un archivo, cada color una capa, y las **aristas rojas** son los imports que violan reglas. [Demo en vivo →](https://sanbenito12.github.io/Autopsia/report.html)
+La consola muestra cobertura, hallazgos con línea de origen y archivos con más violaciones. El HTML independiente colorea archivos por capa y resalta dependencias internas infractoras en rojo. [Explora el reporte de ejemplo](https://sanbenito12.github.io/Autopsia/report.es.html).
+
+Para reproducir el fixture público de ocho archivos desde este repositorio, ejecuta `npm ci` y `npm run scan:fixture`: contiene cinco violaciones intencionales. El [ejemplo antes/después](before-after.md) elimina una y compara los resultados.
+
+La salud por capa es el porcentaje de archivos clasificados sin violaciones, incluida la deuda tolerada. Las capas vacías muestran `N/A`. No es una puntuación general de calidad.
 
 <a id="adopting-autopsia-in-a-legacy-project"></a>
-## Adopción en un proyecto legacy (baseline)
+## Adoptar Autopsia con deuda heredada
 
-Un proyecto real con historia va a arrojar violaciones — quizá muchas. No tienes que arreglarlas hoy para adoptar la herramienta:
+Después de revisar configuración, cobertura y hallazgos, registra la deuda actual una vez:
 
 ```bash
-npx autopsia-rn --lang es scan . --update-baseline
+npx autopsia-rn@0.6.0 scan . --update-baseline --lang es
+npx autopsia-rn@0.6.0 scan . --ci --lang es
 ```
 
-```
-  Total: 25 violaciones en 12 archivos
+Versiona `autopsia.config.json` y `autopsia-baseline.json`. CI falla por errores nuevos o análisis incompleto cuando `strict: true`. La deuda tolerada permanece visible y no falla por sí sola.
 
-  ✔ Baseline guardado en /tu/proyecto/autopsia-baseline.json
-    25 violación(es) tolerada(s). En CI fallan los errores nuevos o el análisis estricto incompleto.
-```
+Después de corregir deuda, revisa y regenera el baseline en el mismo cambio. No lo regeneres automáticamente en CI: aceptarías deuda nueva. Las ocurrencias adicionales cuentan como nuevas; mover líneas de código no.
 
-A partir de ahí:
+Usa `--no-baseline` para inspeccionar toda la deuda. Los baselines siguen en versión 1 y mantienen sus campos canónicos en español.
 
-- Las violaciones registradas se reportan en gris como **toleradas** y `--ci` no falla por ellas. El resumen dice `X nuevas · Y toleradas`.
-- Una violación **nueva** (un import que no estaba) sí falla. El CI impide errores nuevos de las reglas configuradas; el análisis estricto incompleto también falla.
-- Cuando arregles violaciones viejas, vuelve a correr `--update-baseline`: salen del baseline y ya no pueden regresar.
-- **Commitea `autopsia-baseline.json`** para que todo el equipo (y el CI) tolere lo mismo.
-- ¿Quieres ver el panorama completo, con todo lo tolerado en rojo? `npx autopsia-rn --lang es scan . --no-baseline`.
+## Idiomas y límites
 
-El baseline guarda regla + archivo + detalle, **sin números de línea**: editar un archivo no invalida sus entradas.
+Inglés es el idioma por defecto; `--lang en|es` funciona antes o después del subcomando y cambia consola y HTML. El JSON mantiene texto canónico español y metadatos opcionales de diagnóstico. Los reportes antiguos sin metadatos conservan su texto original.
 
-## Siguientes pasos
+Autopsia analiza reglas de dependencias configuradas para archivos TS/TSX incluidos. Excluye imports explícitos de tipos y símbolos resueltos exclusivamente como tipos; conserva imports mixtos y casos inciertos. No reproduce todas las transformaciones de Metro. El acceso a datos se detecta mediante imports de módulos configurados, no mediante llamadas globales a `fetch()`. ESLint y TypeScript siguen siendo útiles junto a Autopsia.
 
-- [Reglas](rules.es.md) — qué detecta cada una, con el código malo, el fix, y cómo suprimir un caso legítimo con `// autopsia-ignore-next-line`
-- [Configuración](configuration.es.md) — capas con nombres no estándar, severidad por regla (`error`/`warning`/`off`), módulos de datos propios
-- [CI](ci.es.md) — GitHub Actions con baseline en 5 minutos
-
-## Idioma y alcance (0.5)
-
-La salida predeterminada está en inglés. Usa `--lang es` antes o después de `scan` o `init` para mostrar español, incluido el HTML. El JSON y baseline v1 mantienen sus mensajes canónicos en español para conservar compatibilidad; los metadatos `diagnostic` son opcionales. Los reportes antiguos sin ellos muestran su texto original.
-
-Autopsia comprueba dependencias contra reglas configuradas. No certifica toda la arquitectura ni detecta llamadas globales a `fetch()`. Los imports exclusivamente de tipos se excluyen de las reglas.
+- [Reglas y correcciones](rules.es.md)
+- [Configuración y opciones](configuration.es.md)
+- [CI y baseline](ci.es.md)
+- [Migración 0.5 → 0.6](migration-0.6.es.md)

@@ -159,3 +159,27 @@ describe('initProject', () => {
     expect(readConfig().layers.map((l) => l.name)).toEqual(['domain']);
   });
 });
+
+describe('reviewable React Native proposal', () => {
+  it('previews composition, application and recognized shared layers without writing', async () => {
+    const { buildReactNativeConfig } = await import('../src/init');
+    mkdirs('src/app', 'src/di', 'src/application', 'src/domain', 'src/presentation', 'src/shared/domain', 'src/shared/utils', 'src/features/cart/application', 'src/features/cart/shared/data');
+    fs.writeFileSync(path.join(tmpRoot, 'App.tsx'), 'export {};');
+    const proposal = buildReactNativeConfig(tmpRoot);
+    const byName = Object.fromEntries(proposal.layers.map(l => [l.name, l]));
+    expect(byName.composition.files).toEqual(['App.tsx']);
+    expect(byName.composition.allowedDependencies).toContain('presentation');
+    expect(byName.presentation.allowedDependencies).toEqual(['application', 'domain']);
+    expect(byName.application.allowedDependencies).toEqual(['domain']);
+    expect(byName.domain.allowedDependencies).toEqual([]);
+    expect(byName.domain.patterns).toContain('src/shared/domain/*');
+    expect(JSON.stringify(proposal)).not.toContain('shared/utils');
+    const result = initProject(tmpRoot, false, { preset: 'react-native', dryRun: true });
+    expect(result.status).toBe('preview'); expect(result.config).toEqual(proposal);
+    expect(fs.existsSync(result.configPath)).toBe(false);
+    fs.writeFileSync(result.configPath, '{"keep": true}');
+    initProject(tmpRoot, true, { preset: 'react-native', dryRun: true });
+    expect(fs.readFileSync(result.configPath, 'utf8')).toBe('{"keep": true}');
+    expect(initProject(tmpRoot, false, { preset: 'react-native' }).status).toBe('exists');
+  });
+});

@@ -1,0 +1,34 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Autopsia CLI — public fixture</title><style>body{margin:0;padding:28px;background:#101211;color:#e5f1de}pre{font:14px/1.5 ui-monospace,monospace;white-space:pre-wrap;overflow-wrap:anywhere}a{color:#b9f586}</style><a href="index.html">Autopsia · public fixture · local 0.6 preview</a><pre>$ autopsia --version
+0.6.0
+
+$ autopsia doctor fixtures/sample-app
+Doctor: fixtures/sample-app
+Configuration: fixtures/sample-app/autopsia.config.json
+TypeScript configuration: fixtures/sample-app/tsconfig.json
+TypeScript: 5.5.2
+Files scanned: 8; classified: 8
+Detected structure: presentation: presentation; domain: domain; data: data; infrastructure: infrastructure
+Ready: no readiness or coverage blockers. Run scan to check dependency rules.
+
+$ autopsia scan fixtures/sample-app
+[excerpt — full output linked below]
+
+  Scanning fixtures/sample-app ...
+
+  🔬 AUTOPSIA — Architecture report
+  fixtures/sample-app · 8 files analyzed
+
+  Evaluated file health
+  presentation     ██████████░░░░░░░░░░ 50% (4 files)
+  domain           ██████████░░░░░░░░░░ 50% (2 files)
+  data             ████████████████████ 100% (1 files)
+  infrastructure   ████████████████████ 100% (1 files)
+
+  Analysis coverage
+  Architecture coverage        100% (8 / 8 files)
+  Internal dependencies           9 resolved · 0 unresolved
+  ✔ COMPLETE ANALYSIS — all included files and dependencies checked
+
+  ✖ dependency-direction — 2 violation(s)
+  …
+  Total: 5 violations in 3 files</pre><a href="demo-output.txt">Full scan transcript</a> · <a href="demo-doctor.txt">Full doctor transcript</a></html>

@@ -3,6 +3,7 @@ import { checkDependencyDirection } from './dependency-direction';
 import { checkDirectDataAccess } from './direct-data-access';
 import { checkForbiddenExternal } from './forbidden-external';
 import { checkCircularDeps } from './circular-deps';
+import { checkFeatureBoundaries } from './feature-boundaries';
 
 /**
  * Ejecuta las reglas respetando la sección "rules" del config:
@@ -16,6 +17,7 @@ export const ALL_RULES = [
   'direct-data-access',
   'forbidden-external',
   'circular-deps',
+  'feature-boundaries',
 ] as const;
 
 export type RuleName = (typeof ALL_RULES)[number];
@@ -30,6 +32,7 @@ export function runRules(graph: FileNode[], config: AutopsiaConfig): Violation[]
     'direct-data-access': () => checkDirectDataAccess(graph, config),
     'forbidden-external': () => checkForbiddenExternal(graph, config),
     'circular-deps': () => checkCircularDeps(graph),
+    'feature-boundaries': () => checkFeatureBoundaries(graph, config),
   };
 
   const violations: Violation[] = [];

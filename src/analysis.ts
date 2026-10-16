@@ -33,8 +33,10 @@ export function validateConfig(config: AutopsiaConfig): AnalysisIssue[] {
       issues.push({ diagnostic: { message: { code: "config.duplicate", params: {p0: layer.name} } }, kind: 'invalid-config', message: format("config.duplicate", {p0: layer.name}, "es") });
     }
     names.add(layer.name);
-    if (!strings(layer.patterns) || layer.patterns.length === 0) {
-      issues.push({ diagnostic: { message: { code: "config.patterns", params: {p0: layer.name} } }, kind: 'invalid-config', message: format("config.patterns", {p0: layer.name}, "es") });
+    if ((layer.patterns !== undefined && !strings(layer.patterns)) ||
+        (layer.files !== undefined && (!strings(layer.files) || layer.files.some((file) => /[\\:*?]/.test(file) || file.startsWith('/') || file.split('/').some((part) => !part || part === '.' || part === '..')))) ||
+        (!(layer.patterns?.length) && !(layer.files?.length))) {
+      issues.push({ diagnostic: { message: { code: "config.paths", params: {p0: layer.name} } }, kind: 'invalid-config', message: format("config.paths", {p0: layer.name}, "es") });
     }
     if (layer.forbiddenExternal !== undefined && !strings(layer.forbiddenExternal)) issues.push({ diagnostic: { message: { code: "config.external", params: {p0: layer.name} } }, kind: 'invalid-config', message: format("config.external", {p0: layer.name}, "es") });
     if (layer.allowedDependencies !== undefined && !strings(layer.allowedDependencies)) {
@@ -75,6 +77,34 @@ export function validateConfig(config: AutopsiaConfig): AnalysisIssue[] {
     }
     if (!['error', 'warning', 'off'].includes(level)) {
       issues.push({ diagnostic: { message: { code: "config.level", params: {p0: rule, p1: level} } }, kind: 'invalid-config', message: format("config.level", {p0: rule, p1: level}, "es") });
+    }
+  }
+
+  if (config.features !== undefined) {
+    const validCrossImports =
+      config.features &&
+      typeof config.features === 'object' &&
+      !Array.isArray(config.features) &&
+      (config.features.allowedCrossImports === undefined ||
+        (typeof config.features.allowedCrossImports === 'object' &&
+          config.features.allowedCrossImports !== null &&
+          !Array.isArray(config.features.allowedCrossImports) &&
+          Object.values(config.features.allowedCrossImports).every(
+            (v) => Array.isArray(v) && v.every((item) => typeof item === 'string' && item.trim().length > 0)
+          )));
+    if (
+      typeof config.features !== 'object' ||
+      config.features === null ||
+      Array.isArray(config.features) ||
+      (config.features.patterns !== undefined && !strings(config.features.patterns)) ||
+      (config.features.enforcePublicApi !== undefined && typeof config.features.enforcePublicApi !== 'boolean') ||
+      !validCrossImports
+    ) {
+      issues.push({
+        diagnostic: { message: { code: 'config.features', params: {} } },
+        kind: 'invalid-config',
+        message: format('config.features', {}, 'es'),
+      });
     }
   }
   return issues;
