@@ -28,8 +28,11 @@ export interface DoctorReport {
   issues: DoctorIssue[];
 }
 export function resolveConfigPath(root: string, config = 'autopsia.config.json'): string {
-  return path.isAbsolute(config) ? config : fs.existsSync(path.join(root, config))
-    ? path.join(root, config) : path.resolve(config);
+  if (path.isAbsolute(config)) return config;
+  const inRoot = path.join(root, config);
+  // The default config always belongs to the scanned project: never borrow the one in cwd.
+  if (config === 'autopsia.config.json' || fs.existsSync(inRoot)) return inRoot;
+  return path.resolve(config);
 }
 const recommendations: Record<AnalysisIssue['kind'] | 'missing-config', MessageKey> = {
   'missing-config': 'doctor.initFix', 'invalid-config': 'doctor.configFix',
