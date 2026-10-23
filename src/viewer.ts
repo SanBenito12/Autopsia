@@ -19,7 +19,7 @@ import { ScanResult } from './types';
  * - circular-deps: detail = "a → b → ... → a" (cada par consecutivo)
  * Las reglas sobre imports externos no generan aristas internas.
  */
-function violationEdges(result: ScanResult): string[] {
+export function violationEdges(result: ScanResult): string[] {
   const edges = new Set<string>();
   for (const v of result.violations) {
     if (v.rule === 'feature-boundaries') {
