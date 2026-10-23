@@ -37,67 +37,124 @@ export function Graph({ t, data, root }: { t: T; data: ScanOk; root: string }) {
         byId.get(target)!.degree++;
       }
     }
-    const radius = (d: Node) => 4 + Math.min(10, Math.sqrt(d.degree) * 1.8);
+    const radius = (d: Node) => 3.5 + Math.min(9, Math.sqrt(d.degree) * 1.6);
+
+    // Cada capa tiene su "isla": centros repartidos en una elipse; lo sin capa va al centro.
+    const groups = [...layers, ...(nodes.some((n) => !n.layer) ? [null] : [])];
+    const ring = groups.filter((g) => g !== null);
+    const centers = new Map<string | null, { x: number; y: number }>();
+    ring.forEach((g, i) => {
+      const a = -Math.PI / 2 + (i * 2 * Math.PI) / Math.max(ring.length, 1);
+      const spread = ring.length > 1 ? 1 : 0;
+      centers.set(g, { x: width / 2 + Math.cos(a) * width * 0.48 * spread, y: height / 2 + Math.sin(a) * height * 0.48 * spread });
+    });
+    centers.set(null, { x: width / 2, y: height / 2 });
+    const centerOf = (d: Node) => centers.get(d.layer) ?? centers.get(null)!;
 
     const defs = svg.append('defs');
     for (const [id, color] of [['arrow', 'var(--rule-strong)'], ['arrow-v', 'var(--eosin)']]) {
-      defs.append('marker').attr('id', id).attr('viewBox', '0 -4 8 8').attr('refX', 8).attr('markerWidth', 6).attr('markerHeight', 6)
+      defs.append('marker').attr('id', id).attr('viewBox', '0 -4 8 8').attr('refX', 7).attr('markerWidth', 5).attr('markerHeight', 5)
         .attr('orient', 'auto').append('path').attr('d', 'M0,-4L8,0L0,4').attr('fill', color);
     }
+    const glow = defs.append('filter').attr('id', 'glow').attr('x', '-100%').attr('y', '-100%').attr('width', '300%').attr('height', '300%');
+    glow.append('feGaussianBlur').attr('stdDeviation', 3.5).attr('result', 'blur');
+    const merge = glow.append('feMerge');
+    merge.append('feMergeNode').attr('in', 'blur');
+    merge.append('feMergeNode').attr('in', 'SourceGraphic');
 
     const stage = svg.append('g');
-    const linkSel = stage.append('g').selectAll<SVGLineElement, Link>('line').data(links).join('line')
+    const haloLayer = stage.append('g');
+    const haloSel = haloLayer.selectAll<SVGCircleElement, string>('circle').data(ring).join('circle')
+      .attr('class', 'cluster-halo')
+      .attr('fill', (g) => layerColor(layers, g)).attr('fill-opacity', 0.05)
+      .attr('stroke', (g) => layerColor(layers, g)).attr('stroke-opacity', 0.3).attr('stroke-dasharray', '2 5');
+    // Las etiquetas de capa viven fuera del zoom para leerse siempre al mismo tamaño
+    const labelLayer = svg.append('g');
+    let view = d3.zoomIdentity;
+    const haloLabelSel = labelLayer.selectAll<SVGTextElement, string>('text').data(ring).join('text')
+      .attr('class', 'cluster-label').attr('text-anchor', 'middle').attr('fill', (g) => layerColor(layers, g));
+    haloLabelSel.append('tspan').text((g) => g);
+    haloLabelSel.append('tspan').attr('class', 'cluster-count').attr('dx', 6)
+      .text((g) => String(nodes.filter((n) => n.layer === g).length));
+
+    const linkSel = stage.append('g').selectAll<SVGPathElement, Link>('path').data(links).join('path')
+      .attr('fill', 'none')
       .attr('stroke', (d) => (d.violation ? 'var(--eosin)' : 'var(--rule-strong)'))
-      .attr('stroke-width', (d) => (d.violation ? 2 : 1))
+      .attr('stroke-width', (d) => (d.violation ? 1.8 : 0.8))
       .attr('marker-end', (d) => `url(#${d.violation ? 'arrow-v' : 'arrow'})`)
-      .attr('class', 'g-link');
+      .attr('class', (d) => `g-link ${d.violation ? 'violation' : ''}`);
+    // Las violaciones van encima del resto de aristas
+    linkSel.filter((d) => d.violation).raise();
+    const ringSel = stage.append('g').selectAll<SVGCircleElement, Node>('circle').data(nodes.filter((n) => n.bad)).join('circle')
+      .attr('class', 'g-ring').attr('r', radius);
     const nodeSel = stage.append('g').selectAll<SVGCircleElement, Node>('circle').data(nodes).join('circle')
       .attr('r', radius)
-      .attr('fill', (d) => layerColor(layers, d.layer))
-      .attr('stroke', (d) => (d.bad ? 'var(--eosin)' : 'var(--glass)'))
-      .attr('stroke-width', (d) => (d.bad ? 2.5 : 1.5))
+      .attr('fill', (d) => (d.bad ? 'var(--eosin)' : layerColor(layers, d.layer)))
+      .attr('stroke', 'var(--glass)')
+      .attr('stroke-width', 1.5)
+      .attr('filter', (d) => (d.bad ? 'url(#glow)' : null))
       .attr('class', 'g-node')
       .style('cursor', 'pointer')
       .on('click', (event, d) => { event.stopPropagation(); setSelected(d.id); });
     nodeSel.append('title').text((d) => d.id);
     const labelSel = stage.append('g').selectAll<SVGTextElement, Node>('text').data(nodes).join('text')
-      .attr('class', 'node-label g-label').attr('dy', -10).attr('text-anchor', 'middle')
+      .attr('class', (d) => `node-label g-label ${d.bad ? 'bad' : ''}`).attr('text-anchor', 'middle')
       .text((d) => basename(d.id));
 
     const sim = d3.forceSimulation(nodes)
-      .force('link', d3.forceLink<Node, Link>(links).id((d) => d.id).distance(70))
-      .force('charge', d3.forceManyBody().strength(-220))
-      .force('center', d3.forceCenter(width / 2, height / 2))
-      .force('collide', d3.forceCollide<Node>().radius((d) => radius(d) + 4))
-      // Gravedad suave: mantiene juntos los componentes desconectados
-      .force('x', d3.forceX(width / 2).strength(0.07))
-      .force('y', d3.forceY(height / 2).strength(0.07))
+      .force('link', d3.forceLink<Node, Link>(links).id((d) => d.id).distance(42)
+        .strength((l) => ((l.source as Node).layer === (l.target as Node).layer ? 0.35 : 0.02)))
+      .force('charge', d3.forceManyBody().strength(-90))
+      .force('collide', d3.forceCollide<Node>().radius((d) => radius(d) + 3))
+      .force('x', d3.forceX<Node>((d) => centerOf(d).x).strength(0.2))
+      .force('y', d3.forceY<Node>((d) => centerOf(d).y).strength(0.2))
       .stop();
     // Precalcula el layout para que el grafo aparezca ya asentado
-    for (let i = 0; i < 300; i++) sim.tick();
+    for (let i = 0; i < 320; i++) sim.tick();
 
     nodeSel.call(d3.drag<SVGCircleElement, Node>()
       .on('start', (event, d) => { if (!event.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
       .on('drag', (event, d) => { d.fx = event.x; d.fy = event.y; })
       .on('end', (event, d) => { if (!event.active) sim.alphaTarget(0); d.fx = null; d.fy = null; }));
 
+    let hulls = new Map<string, { x: number; y: number; r: number }>();
+    const placeLabels = () => haloLabelSel
+      .attr('x', (g) => view.applyX(hulls.get(g)?.x ?? 0))
+      .attr('y', (g) => view.applyY((hulls.get(g)?.y ?? 0) - (hulls.get(g)?.r ?? 0)) - 8);
     const draw = () => {
-      linkSel.each(function (d) {
+      linkSel.attr('d', (d) => {
         const s = d.source as Node, tg = d.target as Node;
         const dx = tg.x! - s.x!, dy = tg.y! - s.y!;
         const len = Math.hypot(dx, dy) || 1;
+        // Curva suave: el punto de control se separa en perpendicular
+        const cx = (s.x! + tg.x!) / 2 - (dy / len) * len * 0.12, cy = (s.y! + tg.y!) / 2 + (dx / len) * len * 0.12;
+        const ex = tg.x! - cx, ey = tg.y! - cy, el = Math.hypot(ex, ey) || 1;
         const r = radius(tg) + 2;
-        d3.select(this).attr('x1', s.x!).attr('y1', s.y!).attr('x2', tg.x! - (dx / len) * r).attr('y2', tg.y! - (dy / len) * r);
+        return `M${s.x},${s.y}Q${cx},${cy} ${tg.x! - (ex / el) * r},${tg.y! - (ey / el) * r}`;
       });
       nodeSel.attr('cx', (d) => d.x!).attr('cy', (d) => d.y!);
-      labelSel.attr('x', (d) => d.x!).attr('y', (d) => d.y! - radius(d) + 2);
+      ringSel.attr('cx', (d) => d.x!).attr('cy', (d) => d.y!);
+      labelSel.attr('x', (d) => d.x!).attr('y', (d) => d.y! - radius(d) - 4);
+      const hull = new Map<string, { x: number; y: number; r: number }>();
+      for (const g of ring) {
+        const members = nodes.filter((n) => n.layer === g);
+        if (!members.length) continue;
+        const x = d3.mean(members, (n) => n.x!)!, y = d3.mean(members, (n) => n.y!)!;
+        const r = (d3.max(members, (n) => Math.hypot(n.x! - x, n.y! - y) + radius(n)) ?? 0) + 18;
+        hull.set(g, { x, y, r });
+      }
+      haloSel.attr('cx', (g) => hull.get(g)?.x ?? 0).attr('cy', (g) => hull.get(g)?.y ?? 0).attr('r', (g) => hull.get(g)?.r ?? 0);
+      hulls = hull;
+      placeLabels();
     };
     sim.on('tick', draw);
     draw();
 
     const zoom = d3.zoom<SVGSVGElement, unknown>().scaleExtent([0.2, 4]).on('zoom', (e) => {
       stage.attr('transform', e.transform.toString());
-      labelSel.style('display', (d) => (e.transform.k > 1.15 || nodes.length < 40 || d.bad ? null : 'none'));
+      view = e.transform;
+      placeLabels();
+      labelSel.style('display', (d) => (e.transform.k > 1.15 || nodes.length < 40 || (d.bad && e.transform.k > 0.6) ? null : 'none'));
     });
     svg.call(zoom).on('dblclick.zoom', null).on('click', () => setSelected(null));
     labelSel.style('display', (d) => (nodes.length < 40 || d.bad ? null : 'none'));
@@ -107,7 +164,7 @@ export function Graph({ t, data, root }: { t: T; data: ScanOk; root: string }) {
       const xs = nodes.map((n) => n.x ?? 0), ys = nodes.map((n) => n.y ?? 0);
       if (!xs.length) return;
       const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
-      const top = 64, bottom = 52, side = 48;
+      const top = 96, bottom = 64, side = 72; // deja aire para las etiquetas de cada capa
       const k = Math.max(0.2, Math.min(1.6, Math.min((width - side * 2) / Math.max(x1 - x0, 1), (height - top - bottom) / Math.max(y1 - y0, 1))));
       const transform = d3.zoomIdentity.translate(width / 2, top + (height - top - bottom) / 2).scale(k).translate(-(x0 + x1) / 2, -(y0 + y1) / 2);
       if (animate) svg.transition().duration(450).call(zoom.transform, transform);
@@ -145,7 +202,12 @@ export function Graph({ t, data, root }: { t: T; data: ScanOk; root: string }) {
     svg.selectAll<SVGTextElement, Node>('.g-label')
       .style('visibility', (d) => (visible(d) ? null : 'hidden'))
       .attr('opacity', (d) => (dim(d) ? 0.15 : 1));
-    svg.selectAll<SVGLineElement, Link>('.g-link')
+    svg.selectAll<SVGCircleElement, Node>('.g-ring')
+      .style('display', (d) => (visible(d) && !dim(d) ? null : 'none'));
+    svg.selectAll<SVGElement, string>('.cluster-halo, .cluster-label')
+      .style('display', (g) => (hidden.has(g) ? 'none' : null))
+      .attr('opacity', selected || q ? 0.35 : 1);
+    svg.selectAll<SVGPathElement, Link>('.g-link')
       .style('display', (d) => (visible(d.source as Node) && visible(d.target as Node) ? null : 'none'))
       .attr('opacity', (d) => {
         const s = (d.source as Node).id, tg = (d.target as Node).id;

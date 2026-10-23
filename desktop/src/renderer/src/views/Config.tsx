@@ -34,7 +34,7 @@ export function Config({ t, root, data, hasConfig, configPath, onChanged, toast 
           </>
         ) : (
           <>
-            <h2 style={{ font: '400 34px var(--serif)', marginBottom: 8 }}>{t('noConfigTitle')}</h2>
+            <h2 className="page-title">{t('noConfigTitle')}</h2>
             <p className="lead" style={{ color: 'var(--ink-2)', maxWidth: '64ch' }}>{t('noConfigBody')}</p>
             <InitPanel t={t} root={root} overwrite={false} onCreated={onChanged} toast={toast} />
           </>

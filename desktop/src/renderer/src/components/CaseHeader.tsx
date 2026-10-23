@@ -45,8 +45,12 @@ export function CaseHeader({ t, lang, root, data, loading, noConfig, watching, o
           </div>
         </div>
       </div>
-      {data && <Verdict t={t} lang={lang} data={data} />}
-      {data && data.result.totalFiles > 0 && <Tissue t={t} data={data} />}
+      {data && (
+        <div className="summary">
+          <Verdict t={t} lang={lang} data={data} />
+          {data.result.totalFiles > 0 && <LayerBars t={t} data={data} />}
+        </div>
+      )}
     </header>
   );
 }
@@ -55,42 +59,54 @@ function Verdict({ t, lang, data }: { t: T; lang: Lang; data: ScanOk }) {
   const { result } = data;
   const fresh = result.violations.length;
   const tolerated = result.tolerated?.length ?? 0;
+  const incomplete = result.analysis?.complete === false;
   if (result.totalFiles === 0) {
     return (
       <div className="verdict" data-tour="verdict">
-        <strong className="empty">{t('emptyVerdict')}</strong>
+        <p className="verdict-empty">{t('emptyVerdict')}</p>
       </div>
     );
   }
   return (
     <div className="verdict" data-tour="verdict">
-      <strong className={fresh ? 'issues' : 'clean'}>
-        {fresh === 0 ? t('verdictClean') : fresh === 1 ? t('verdictOne') : t('verdictIssues', fresh)}
-      </strong>
-      <span className="facts">
+      <div className="stat-main">
+        <span className={`stat-num ${fresh ? 'issues' : 'clean'}`}>{fresh}</span>
+        <span className="stat-label">{fresh === 1 ? t('statNewOne') : t('statNew')}</span>
+      </div>
+      <dl className="stats">
+        <div className={incomplete ? 'warn' : ''} title={incomplete ? t('incomplete') : undefined}>
+          <dt>{t('statCoverage')}</dt><dd>{data.coveragePercent}%</dd>
+        </div>
+        <div><dt>{t('statFiles')}</dt><dd>{result.totalFiles}</dd></div>
+      </dl>
+      <p className="facts">
+        {incomplete && <span className="warn">{t('incomplete')}</span>}
         {tolerated > 0 && <span>{t('tolerated', tolerated)}</span>}
         {result.suppressedCount ? <span>{t('suppressed', result.suppressedCount)}</span> : null}
-        <span className={result.analysis?.complete === false ? 'warn' : ''}>
-          {t('coverage', data.coveragePercent)}{result.analysis?.complete === false ? ` · ${t('incomplete')}` : ''}
-        </span>
-        <span>{t('scannedAt', relativeTime(result.scannedAt, lang), result.totalFiles, data.durationMs)}</span>
-      </span>
+        <span title={t('duration', data.durationMs)}>{t('scannedAt', relativeTime(result.scannedAt, lang))}</span>
+      </p>
     </div>
   );
 }
 
-/**
- * Banda de tejido: un segmento por capa, ancho proporcional a sus archivos,
- * teñido de hematoxilina (sano) a eosina (lesionado) según su salud.
- */
-function Tissue({ t, data }: { t: T; data: ScanOk }) {
-  const { filesByLayer, healthByLayer, scannedAt } = data.result;
+/** Archivos con alguna violación (nueva o tolerada) por capa, igual que computeHealth. */
+function lesionsByLayer(data: ScanOk): Record<string, number> {
+  const { violations, tolerated = [], graph } = data.result;
+  const hurt = new Set([...violations, ...tolerated].map((v) => v.file));
+  const counts: Record<string, number> = {};
+  for (const node of graph) if (node.layer && hurt.has(node.path)) counts[node.layer] = (counts[node.layer] ?? 0) + 1;
+  return counts;
+}
+
+/** Una barra por capa: violeta lo sano, rosa la fracción real de archivos con violaciones. */
+function LayerBars({ t, data }: { t: T; data: ScanOk }) {
+  const { filesByLayer, scannedAt } = data.result;
   const layers = Object.entries(filesByLayer);
-  const ref = useRef<HTMLDivElement>(null);
+  const lesions = lesionsByLayer(data);
   const first = useRef(true);
   const [reveal, setReveal] = useState(true);
 
-  // La tinción se anima solo cuando llega un escaneo nuevo
+  // Las barras crecen solo cuando llega un escaneo nuevo
   useEffect(() => {
     if (first.current) { first.current = false; return; }
     setReveal(false);
@@ -100,33 +116,22 @@ function Tissue({ t, data }: { t: T; data: ScanOk }) {
 
   if (layers.length === 0) return null;
   return (
-    <div data-tour="tissue" className={`tissue ${reveal ? 'reveal' : ''}`} ref={ref} aria-label={t('layerHealth')}>
-      <div className="tissue-band">
-        {layers.map(([layer, files], i) => {
-          const health = healthByLayer[layer] ?? 100;
-          // Cualquier lesión debe verse: con 1 archivo afectado ya hay un 50 % de eosina
-          const eosin = health >= 100 ? 0 : Math.min(100, 50 + (100 - health) * 0.5);
-          const stain = files === 0
-            ? 'var(--layer-none)'
-            : `color-mix(in oklab, var(--eosin) ${eosin}%, var(--hematoxylin))`;
-          return (
-            <div key={layer} className="tissue-seg"
-              style={{ flex: Math.max(files, 1), ['--stain' as string]: stain, ['--i' as string]: i }}
-              title={`${layer}: ${files === 0 ? 'N/A' : health + '%'} · ${t('files', files)}`} />
-          );
-        })}
-      </div>
-      <div className="tissue-legend">
-        {layers.map(([layer, files]) => {
-          const health = healthByLayer[layer] ?? 100;
-          return (
-            <div key={layer} style={{ flex: Math.max(files, 1) }} title={`${layer}: ${t('files', files)}`}>
-              <div className="ln">{layer}</div>
-              <div className={`lv ${files > 0 && health < 100 ? 'bad' : ''}`}>{files === 0 ? 'N/A' : `${health}%`}</div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
+    <ul data-tour="tissue" className={`layer-bars ${reveal ? 'reveal' : ''}`} aria-label={t('layerHealth')}>
+      {layers.map(([layer, files], i) => {
+        const hurt = lesions[layer] ?? 0;
+        return (
+          <li key={layer} style={{ ['--i' as string]: i }}>
+            <span className="ln">{layer}</span>
+            <span className={`bar-track ${files === 0 ? 'empty' : ''}`}>
+              {files > 0 && <span className="bar-ok" />}
+              {hurt > 0 && <span className="bar-bad" style={{ width: `${(hurt / files) * 100}%` }} />}
+            </span>
+            <span className={`lv ${hurt > 0 ? 'bad' : ''}`}>
+              {files === 0 ? t('layerEmpty') : hurt > 0 ? t('layerHurt', hurt, files) : t('files', files)}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
   );
 }

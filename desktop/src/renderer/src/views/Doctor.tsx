@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { DoctorView, Lang } from '@shared/types';
 import { api } from '../lib/api';
 import type { T } from '../lib/i18n';
+import { displayPath } from '../lib/layers';
 
 export function Doctor({ t, lang, root }: { t: T; lang: Lang; root: string }) {
   const [report, setReport] = useState<DoctorView | null>(null);
@@ -41,8 +42,8 @@ export function Doctor({ t, lang, root }: { t: T; lang: Lang; root: string }) {
           </>
         )}
         <dl className="kv selectable">
-          <dt>autopsia.config.json</dt><dd className="mono">{report.configPath}</dd>
-          <dt>tsconfig</dt><dd className="mono">{report.tsconfigPath}</dd>
+          <dt>autopsia.config.json</dt><dd className="mono" title={report.configPath}>{displayPath(root, report.configPath)}</dd>
+          <dt>tsconfig</dt><dd className="mono" title={report.tsconfigPath}>{displayPath(root, report.tsconfigPath)}</dd>
           <dt>TypeScript</dt><dd>{report.typescriptVersion}</dd>
           <dt>{t('detectedLayers')}</dt>
           <dd>{report.detected.length ? report.detected.map((d) => `${d.name} (${d.folders.join(', ')})`).join(' · ') : '—'}</dd>
@@ -52,8 +53,8 @@ export function Doctor({ t, lang, root }: { t: T; lang: Lang; root: string }) {
             <span className="code">{issue.code}</span>
             <div>
               {issue.file && (
-                <button className="loc mono" onClick={() => api.openInEditor(root, issue.file!, issue.line)}>
-                  {issue.file}{issue.line ? `:${issue.line}` : ''}
+                <button className="loc mono" title={issue.file} onClick={() => api.openInEditor(root, issue.file!, issue.line)}>
+                  {displayPath(root, issue.file)}{issue.line ? `:${issue.line}` : ''}
                 </button>
               )}
               <div>{issue.message}</div>

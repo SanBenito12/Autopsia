@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Lang, ReportComparison, ScanOk, Violation } from '@shared/types';
 import { api } from '../lib/api';
 import { ruleName, type T } from '../lib/i18n';
-import { basename, dirname } from '../lib/layers';
+import { basename, dirname, displayPath } from '../lib/layers';
 import type { PushToast } from '../components/Toasts';
 import { guideFor, ignoreComment, rulesDocUrl } from '../lib/guides';
 
@@ -70,7 +70,7 @@ export function Findings({ t, lang, data, root, toast, onDoctor }: { t: T; lang:
       <div className="clean-state"><div>
         <h2>{t('cleanTitle')}</h2>
         <p>{t('cleanBody')}</p>
-        {issues.length > 0 && <AnalysisNotes t={t} issues={issues} onDoctor={onDoctor} />}
+        {issues.length > 0 && <AnalysisNotes t={t} root={root} issues={issues} onDoctor={onDoctor} />}
       </div></div>
     );
   }
@@ -98,7 +98,7 @@ export function Findings({ t, lang, data, root, toast, onDoctor }: { t: T; lang:
             <button className="btn quiet x" onClick={() => setComparison(null)}>{t('dismiss')}</button>
           </div>
         )}
-        {issues.length > 0 && <AnalysisNotes t={t} issues={issues} onDoctor={onDoctor} />}
+        {issues.length > 0 && <AnalysisNotes t={t} root={root} issues={issues} onDoctor={onDoctor} />}
         <div className="list" role="listbox">
           {groups.length === 0 && <p className="placeholder" style={{ color: 'var(--muted)', padding: 16 }}>{t('noFindings')}</p>}
           {groups.map(([rule, list]) => (
@@ -171,13 +171,13 @@ function Detail({ t, lang, item, root, toast }: { t: T; lang: Lang; item: Item; 
   );
 }
 
-function AnalysisNotes({ t, issues, onDoctor }: { t: T; issues: { message: string; file?: string; line?: number }[]; onDoctor?: () => void }) {
+function AnalysisNotes({ t, root, issues, onDoctor }: { t: T; root: string; issues: { message: string; file?: string; line?: number }[]; onDoctor?: () => void }) {
   return (
     <details className="notes">
       <summary>{t('analysisIssues')} ({issues.length})</summary>
       <ul className="selectable">
         {issues.slice(0, 30).map((issue, i) => (
-          <li key={i}>{issue.file ? <code>{issue.file}{issue.line ? `:${issue.line}` : ''}</code> : null} {issue.message}</li>
+          <li key={i}>{issue.file ? <code title={issue.file}>{displayPath(root, issue.file)}{issue.line ? `:${issue.line}` : ''}</code> : null} {issue.message}</li>
         ))}
       </ul>
       {onDoctor && <button className="btn quiet" style={{ marginTop: 6 }} onClick={onDoctor}>{t('seeDoctor')}</button>}
