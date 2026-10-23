@@ -42,11 +42,20 @@ export interface AutopsiaConfig {
   ignore?: string[];
   /** Severidad por regla. Si se omite, todas corren como "error". */
   rules?: Record<string, RuleLevel>;
+  /** Límites de tamaño para la regla component-size (en líneas). */
+  limits?: QualityLimits;
   /**
    * Exige cobertura arquitectónica completa: todos los archivos deben pertenecer
    * a una sola capa y todos los imports internos deben poder resolverse.
    */
   strict?: boolean;
+}
+
+export interface QualityLimits {
+  /** Default 250 */
+  componentLines?: number;
+  /** Default 150 */
+  hookLines?: number;
 }
 
 export type DependencyKind = 'import' | 'dynamic-import' | 'require' | 're-export';
@@ -92,6 +101,19 @@ export interface FileNode {
   dependencies?: Dependency[];
   /** Solo presente si el archivo tiene comentarios autopsia-ignore */
   suppressions?: FileSuppressions;
+  /** Solo presente si el AST tiene hallazgos de calidad de React Native */
+  codeFacts?: CodeFact[];
+}
+
+export type CodeFactKind = 'scrollview-map' | 'flatlist-key' | 'flatlist-render' | 'component-size' | 'hook-size';
+
+/** Patrón de código encontrado en el AST que alimenta las reglas de calidad. */
+export interface CodeFact {
+  kind: CodeFactKind;
+  line: number;
+  params: Record<string, string | number>;
+  /** Reglas suprimidas en esa línea por comentarios autopsia-ignore */
+  suppressedRules?: string[];
 }
 
 export type AnalysisIssueKind =
@@ -101,7 +123,8 @@ export type AnalysisIssueKind =
   | 'invalid-config'
   | 'ambiguous-layer'
   | 'unclassified-file'
-  | 'unresolved-import';
+  | 'unresolved-import'
+  | 'config-smell';
 
 export interface AnalysisIssue {
   diagnostic?: Diagnostic;
@@ -156,6 +179,8 @@ export interface ScanResult {
   graph: FileNode[];
   /** Cobertura y problemas que pueden impedir certificar el resultado. */
   analysis?: AnalysisCoverage;
+  /** Configuración que puede dar un resultado limpio aunque la arquitectura no lo esté. */
+  configWarnings?: AnalysisIssue[];
 }
 
 export interface ReportComparison {

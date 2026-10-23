@@ -3,7 +3,7 @@ import chalk from 'chalk';
 import * as fs from 'fs';
 import * as path from 'path';
 import { AutopsiaConfig, LayerConfig, RuleLevel } from './types';
-import { ALL_RULES } from './rules/run';
+import { ALL_RULES, defaultLevel } from './rules/run';
 import { buildGraph } from './scanner';
 import { loadTsconfig } from './tsconfig';
 
@@ -186,7 +186,7 @@ export function buildConfig(detected: DetectedLayer[], root?: string): AutopsiaC
   });
 
   const rules: Record<string, RuleLevel> = {};
-  for (const rule of ALL_RULES) rules[rule] = 'error';
+  for (const rule of ALL_RULES) rules[rule] = defaultLevel(rule);
 
   const config: AutopsiaConfig = {
     layers,
@@ -258,7 +258,7 @@ export function buildExpoConfig(root: string): AutopsiaConfig {
   }
 
   const rules: Record<string, RuleLevel> = {};
-  for (const rule of ALL_RULES) rules[rule] = 'error';
+  for (const rule of ALL_RULES) rules[rule] = defaultLevel(rule);
   const { dataAccessModules } = detectPackageJsonDataAccess(root);
 
   const config: AutopsiaConfig = {

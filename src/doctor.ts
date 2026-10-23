@@ -7,6 +7,7 @@ import { buildGraph } from './scanner';
 import { detectLayers } from './init';
 import { matchingEvidence } from './classifier';
 import { loadTsconfig } from './tsconfig';
+import { detectConfigSmells } from './smells';
 import { format, MessageKey, present, t } from './i18n';
 
 export interface DoctorIssue extends Omit<AnalysisIssue, 'kind'> {
@@ -26,6 +27,8 @@ export interface DoctorReport {
   coverage: AnalysisCoverage | null;
   detected: ReturnType<typeof detectLayers>;
   issues: DoctorIssue[];
+  /** Configuración válida pero sospechosa: no cambia el estado, avisa. */
+  warnings: DoctorIssue[];
 }
 export function resolveConfigPath(root: string, config = 'autopsia.config.json'): string {
   if (path.isAbsolute(config)) return config;
@@ -39,6 +42,7 @@ const recommendations: Record<AnalysisIssue['kind'] | 'missing-config', MessageK
   'tsconfig-error': 'doctor.tsconfigFix', 'empty-project': 'doctor.emptyFix',
   'unclassified-file': 'doctor.classifyFix', 'ambiguous-layer': 'doctor.ambiguousFix',
   'unresolved-import': 'doctor.importFix', 'unanalyzable-import': 'doctor.computedFix',
+  'config-smell': 'doctor.smellFix',
 };
 export function diagnose(root: string, configFile?: string, tsconfigFile?: string): DoctorReport {
   if (!fs.statSync(root).isDirectory()) throw new Error(t('cli.missingPath', { p0: root }));
@@ -46,7 +50,7 @@ export function diagnose(root: string, configFile?: string, tsconfigFile?: strin
   const configPath = resolveConfigPath(root, configFile);
   const loaded = loadTsconfig(root, tsconfigFile);
   const report: DoctorReport = { schemaVersion: 1, root, configPath, tsconfigPath: loaded.path, typescriptVersion: ts.version,
-    status: 'incomplete', totalFiles: 0, coverage: null, detected: detectLayers(root), issues: [] };
+    status: 'incomplete', totalFiles: 0, coverage: null, detected: detectLayers(root), issues: [], warnings: [] };
   const add = (issue: AnalysisIssue | (Omit<AnalysisIssue, 'kind'> & { kind: 'missing-config' }), config?: AutopsiaConfig) => {
     const { kind, ...rest } = issue;
     const recommendationCode = recommendations[kind];
@@ -80,6 +84,10 @@ export function diagnose(root: string, configFile?: string, tsconfigFile?: strin
   report.totalFiles = graph.length;
   report.coverage = computeAnalysisCoverage(graph, config, loaded.issues);
   report.coverage.issues.forEach(i => add(i, config));
+  for (const smell of detectConfigSmells(graph, config)) {
+    report.warnings.push({ ...smell, code: smell.kind, recommendationCode: 'doctor.smellFix',
+      recommendation: format('doctor.smellFix', {}, 'es') });
+  }
   report.status = loaded.malformed ? 'error' : report.coverage.complete ? 'ready' : 'incomplete';
   return report;
 }
@@ -99,4 +107,9 @@ export function printDoctor(report: DoctorReport): void {
     console.log(t(issue.recommendationCode));
   }
   if (report.issues.length > 10) console.log(t('doctor.more'));
+  if (report.warnings.length > 0) {
+    console.log(`\n${t('doctor.warnings', { p0: report.warnings.length })}`);
+    for (const warning of report.warnings) console.log(`[${warning.code}] ${present(warning).message}`);
+    console.log(t('doctor.smellFix'));
+  }
 }

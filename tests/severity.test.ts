@@ -7,6 +7,8 @@ import { buildConfig, detectLayers, initProject } from '../src/init';
 import { AutopsiaConfig } from '../src/types';
 import { loadGraph, SAMPLE_APP } from './helpers';
 
+const QUALITY_RULES: string[] = ['scrollview-map', 'flatlist-performance', 'component-size'];
+
 describe('severidad configurable por regla', () => {
   const { graph, config: baseConfig } = loadGraph(SAMPLE_APP);
 
@@ -14,11 +16,13 @@ describe('severidad configurable por regla', () => {
     return { ...baseConfig, rules };
   }
 
-  it('sin sección rules todo corre como error (comportamiento v0.1)', () => {
+  it('sin sección rules la arquitectura es error y la calidad de React Native solo avisa', () => {
     const violations = runRules(graph, baseConfig);
     expect(violations).toHaveLength(5);
     expect(violations.every((v) => v.severity === 'error')).toBe(true);
-    for (const rule of ALL_RULES) expect(ruleLevel(baseConfig, rule)).toBe('error');
+    for (const rule of ALL_RULES) {
+      expect(ruleLevel(baseConfig, rule)).toBe(QUALITY_RULES.includes(rule) ? 'warning' : 'error');
+    }
   });
 
   it('nivel "error" explícito equivale al default', () => {
@@ -79,6 +83,9 @@ describe('autopsia init genera la sección rules', () => {
       'forbidden-external': 'error',
       'circular-deps': 'error',
       'feature-boundaries': 'error',
+      'scrollview-map': 'warning',
+      'flatlist-performance': 'warning',
+      'component-size': 'warning',
     });
   });
 

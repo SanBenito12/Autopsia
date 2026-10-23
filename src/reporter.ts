@@ -11,6 +11,7 @@ const issueLabels = (): Record<AnalysisIssueKind, string> => ({
   'unresolved-import': t("report.unresolved", {}),
   'ambiguous-layer': t("report.ambiguous", {}),
   'invalid-config': t("report.config", {}),
+  'config-smell': t("report.smells", {}),
 });
 
 export function analysisCoveragePercent(result: ScanResult): number {
@@ -111,6 +112,12 @@ export function printReport(result: ScanResult): void {
       const color = coveragePct < 50 ? chalk.red.bold : chalk.yellow.bold;
       console.log(color(t("report.issues", {p0: status, p1: analysis.issues.length})));
       printIssueGroups(analysis.issues);
+    }
+    const smells = result.configWarnings ?? [];
+    if (smells.length > 0) {
+      console.log(chalk.yellow.bold(t("report.smellsTitle", {p0: smells.length})));
+      for (const smell of smells.slice(0, 5)) console.log(`      ${present(smell).message}`);
+      if (smells.length > 5) console.log(chalk.gray(t("report.more", {p0: smells.length - 5})));
     }
     console.log('');
   }

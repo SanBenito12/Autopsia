@@ -9,6 +9,7 @@ import { computeHealth } from './reporter';
 import { computeAnalysisCoverage, validateConfig } from './analysis';
 import { loadTsconfig } from './tsconfig';
 import { resolveConfigPath } from './doctor';
+import { detectConfigSmells } from './smells';
 
 /**
  * Núcleo del escaneo sin salida por consola. Lo usan la CLI (executeScan)
@@ -110,6 +111,7 @@ export function scanProject(scanPath: string, opts: ScanProjectOptions = {}): Sc
     suppressedCount: suppressedCount > 0 ? suppressedCount : undefined,
     graph,
     analysis,
+    configWarnings: detectConfigSmells(graph, config),
   };
 
   // La salud refleja TODAS las violaciones (también las toleradas)

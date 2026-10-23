@@ -4,6 +4,7 @@ import { AutopsiaConfig, Dependency, DependencyKind, FileNode, FileSuppressions 
 import { classifyFile } from './classifier';
 import { parseIgnoreDirectives } from './ignores';
 import { loadTsconfig } from './tsconfig';
+import { collectCodeFacts } from './quality';
 
 const DEFAULT_IGNORE = [
   'node_modules', 'dist', 'build', '.git', 'coverage', '__tests__', '__mocks__',
@@ -266,6 +267,14 @@ export function buildGraph(root: string, config: AutopsiaConfig, tsconfigPath?: 
       dependencies,
     };
     if (suppressions) node.suppressions = suppressions;
+    const facts = collectCodeFacts(sf, config.limits);
+    if (facts.length > 0) {
+      const ignores = parseIgnoreDirectives(sf.getFullText());
+      node.codeFacts = facts.map((fact) => {
+        const suppressedRules = [...ignores.fileRules, ...(ignores.lineRules.get(fact.line) ?? [])];
+        return suppressedRules.length ? { ...fact, suppressedRules } : fact;
+      });
+    }
     nodes.push(node);
   }
 
