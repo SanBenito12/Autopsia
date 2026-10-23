@@ -255,6 +255,7 @@ code, .mono { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size:
   padding: 8px 10px 8px 8px; border-radius: var(--r-sm);
 }
 .finding:hover { background: var(--rule); }
+.finding { scroll-margin-top: 40px; }
 .finding[aria-selected='true'] { background: var(--slide); box-shadow: 0 0 0 1px var(--rule-strong); }
 .finding .bar { border-radius: 2px; background: var(--eosin); }
 .finding .bar.warning { background: var(--iodine); }
@@ -419,3 +420,13 @@ code, .mono { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size:
 .autopsia-tour .driver-popover-arrow-side-right.driver-popover-arrow { border-right-color: var(--slide); }
 .autopsia-tour .driver-popover-arrow-side-top.driver-popover-arrow { border-top-color: var(--slide); }
 .autopsia-tour .driver-popover-arrow-side-bottom.driver-popover-arrow { border-bottom-color: var(--slide); }
+
+/* ---------- guía de arreglo ---------- */
+.guide { margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--rule); }
+.guide h3 { font-size: 15px; font-weight: 600; margin-bottom: 8px; }
+.guide h4 { font-size: 12.5px; font-weight: 600; color: var(--muted); margin: 14px 0 4px; }
+.guide ul { padding-left: 18px; color: var(--ink-2); display: flex; flex-direction: column; gap: 6px; max-width: 62ch; }
+.guide p { color: var(--ink-2); max-width: 62ch; }
+.guide .hint { color: var(--ink); background: var(--hematoxylin-soft); border-radius: var(--r-md); padding: 10px 12px; margin-bottom: 10px; }
+.guide pre { margin-top: 14px; padding: 10px 12px; border-radius: var(--r-md); background: var(--slide); border: 1px solid var(--rule); overflow-x: auto; color: var(--ink-2); }
+.guide a.btn { text-decoration: none; }

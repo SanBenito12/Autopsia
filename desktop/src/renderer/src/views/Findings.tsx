@@ -4,11 +4,12 @@ import { api } from '../lib/api';
 import { ruleName, type T } from '../lib/i18n';
 import { basename, dirname } from '../lib/layers';
 import type { PushToast } from '../components/Toasts';
+import { guideFor, ignoreComment, rulesDocUrl } from '../lib/guides';
 
 type Filter = 'all' | 'new' | 'tolerated';
 interface Item { v: Violation; tolerated: boolean; key: string }
 
-export function Findings({ t, lang, data, root, toast }: { t: T; lang: Lang; data: ScanOk; root: string; toast: PushToast }) {
+export function Findings({ t, lang, data, root, toast, onDoctor }: { t: T; lang: Lang; data: ScanOk; root: string; toast: PushToast; onDoctor: () => void }) {
   const { result } = data;
   const [filter, setFilter] = useState<Filter>('all');
   const [query, setQuery] = useState('');
@@ -69,7 +70,7 @@ export function Findings({ t, lang, data, root, toast }: { t: T; lang: Lang; dat
       <div className="clean-state"><div>
         <h2>{t('cleanTitle')}</h2>
         <p>{t('cleanBody')}</p>
-        {issues.length > 0 && <AnalysisNotes t={t} issues={issues} />}
+        {issues.length > 0 && <AnalysisNotes t={t} issues={issues} onDoctor={onDoctor} />}
       </div></div>
     );
   }
@@ -97,7 +98,7 @@ export function Findings({ t, lang, data, root, toast }: { t: T; lang: Lang; dat
             <button className="btn quiet x" onClick={() => setComparison(null)}>{t('dismiss')}</button>
           </div>
         )}
-        {issues.length > 0 && <AnalysisNotes t={t} issues={issues} />}
+        {issues.length > 0 && <AnalysisNotes t={t} issues={issues} onDoctor={onDoctor} />}
         <div className="list" role="listbox">
           {groups.length === 0 && <p className="placeholder" style={{ color: 'var(--muted)', padding: 16 }}>{t('noFindings')}</p>}
           {groups.map(([rule, list]) => (
@@ -118,14 +119,19 @@ export function Findings({ t, lang, data, root, toast }: { t: T; lang: Lang; dat
         </div>
       </div>
       <div className="detail">
-        {current ? <Detail t={t} lang={lang} item={current} root={root} /> : <p className="placeholder">{t('selectFinding')}</p>}
+        {current ? <Detail t={t} lang={lang} item={current} root={root} toast={toast} /> : <p className="placeholder">{t('selectFinding')}</p>}
       </div>
     </div>
   );
 }
 
-function Detail({ t, lang, item, root }: { t: T; lang: Lang; item: Item; root: string }) {
+function Detail({ t, lang, item, root, toast }: { t: T; lang: Lang; item: Item; root: string; toast: PushToast }) {
   const { v, tolerated } = item;
+  const guide = guideFor(lang, v);
+  const copyIgnore = async () => {
+    await navigator.clipboard.writeText(ignoreComment(lang, v));
+    toast(t('copied', v.line ?? 1));
+  };
   const chain = v.rule === 'circular-deps' && v.detail?.includes(' → ') ? v.detail.split(' → ') : null;
   return (
     <div className="selectable">
@@ -147,11 +153,25 @@ function Detail({ t, lang, item, root }: { t: T; lang: Lang; item: Item; root: s
         <button className="btn primary" onClick={() => api.openInEditor(root, v.file, v.line)}>{t('openInEditor')}</button>
         <button className="btn" onClick={() => api.revealInFinder(`${root}/${v.file}`)}>{t('reveal')}</button>
       </div>
+      {guide && (
+        <section className="guide">
+          <h3>{t('howToFix')}</h3>
+          {guide.hint && <p className="hint">{guide.hint}</p>}
+          <ul>{guide.fixes.map((fix, i) => <li key={i}>{fix}</li>)}</ul>
+          <h4>{t('whyMatters')}</h4>
+          <p>{guide.why}</p>
+          <pre className="mono">{ignoreComment(lang, v)}</pre>
+          <div className="actions">
+            <button className="btn" onClick={copyIgnore}>{t('copyIgnore')}</button>
+            <a className="btn quiet" href={rulesDocUrl(lang, v.rule)} target="_blank" rel="noreferrer">{t('fullGuide')}</a>
+          </div>
+        </section>
+      )}
     </div>
   );
 }
 
-function AnalysisNotes({ t, issues }: { t: T; issues: { message: string; file?: string; line?: number }[] }) {
+function AnalysisNotes({ t, issues, onDoctor }: { t: T; issues: { message: string; file?: string; line?: number }[]; onDoctor?: () => void }) {
   return (
     <details className="notes">
       <summary>{t('analysisIssues')} ({issues.length})</summary>
@@ -160,6 +180,7 @@ function AnalysisNotes({ t, issues }: { t: T; issues: { message: string; file?: 
           <li key={i}>{issue.file ? <code>{issue.file}{issue.line ? `:${issue.line}` : ''}</code> : null} {issue.message}</li>
         ))}
       </ul>
+      {onDoctor && <button className="btn quiet" style={{ marginTop: 6 }} onClick={onDoctor}>{t('seeDoctor')}</button>}
     </details>
   );
 }

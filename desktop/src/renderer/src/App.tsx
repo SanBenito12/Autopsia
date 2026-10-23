@@ -230,7 +230,7 @@ export function App() {
                   <button className="btn primary" onClick={pick}>{t('openOther')}</button>
                 </div></div>
               ) : tab === 'findings' ? (
-                <Findings t={t} lang={lang} data={scan.data} root={root} toast={toasts.push} />
+                <Findings t={t} lang={lang} data={scan.data} root={root} toast={toasts.push} onDoctor={() => setTab('doctor')} />
               ) : (
                 <Graph t={t} data={scan.data} root={root} />
               )}

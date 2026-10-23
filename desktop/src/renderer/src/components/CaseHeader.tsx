@@ -104,9 +104,11 @@ function Tissue({ t, data }: { t: T; data: ScanOk }) {
       <div className="tissue-band">
         {layers.map(([layer, files], i) => {
           const health = healthByLayer[layer] ?? 100;
+          // Cualquier lesión debe verse: con 1 archivo afectado ya hay un 50 % de eosina
+          const eosin = health >= 100 ? 0 : Math.min(100, 50 + (100 - health) * 0.5);
           const stain = files === 0
             ? 'var(--layer-none)'
-            : `color-mix(in oklab, var(--hematoxylin) ${health}%, var(--eosin))`;
+            : `color-mix(in oklab, var(--eosin) ${eosin}%, var(--hematoxylin))`;
           return (
             <div key={layer} className="tissue-seg"
               style={{ flex: Math.max(files, 1), ['--stain' as string]: stain, ['--i' as string]: i }}
@@ -118,7 +120,7 @@ function Tissue({ t, data }: { t: T; data: ScanOk }) {
         {layers.map(([layer, files]) => {
           const health = healthByLayer[layer] ?? 100;
           return (
-            <div key={layer} style={{ flex: Math.max(files, 1) }}>
+            <div key={layer} style={{ flex: Math.max(files, 1) }} title={`${layer}: ${t('files', files)}`}>
               <div className="ln">{layer}</div>
               <div className={`lv ${files > 0 && health < 100 ? 'bad' : ''}`}>{files === 0 ? 'N/A' : `${health}%`}</div>
             </div>
