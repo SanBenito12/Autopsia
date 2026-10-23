@@ -46,7 +46,7 @@ export function CaseHeader({ t, lang, root, data, loading, noConfig, watching, o
         </div>
       </div>
       {data && <Verdict t={t} lang={lang} data={data} />}
-      {data && <Tissue t={t} data={data} />}
+      {data && data.result.totalFiles > 0 && <Tissue t={t} data={data} />}
     </header>
   );
 }
@@ -55,6 +55,13 @@ function Verdict({ t, lang, data }: { t: T; lang: Lang; data: ScanOk }) {
   const { result } = data;
   const fresh = result.violations.length;
   const tolerated = result.tolerated?.length ?? 0;
+  if (result.totalFiles === 0) {
+    return (
+      <div className="verdict" data-tour="verdict">
+        <strong className="empty">{t('emptyVerdict')}</strong>
+      </div>
+    );
+  }
   return (
     <div className="verdict" data-tour="verdict">
       <strong className={fresh ? 'issues' : 'clean'}>

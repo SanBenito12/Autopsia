@@ -65,9 +65,10 @@ export function App() {
     if (value.ok) {
       setScan({ kind: 'ok', data: value });
       // Primera vez que se ve un resultado: ofrece el recorrido completo
-      if (!tourSeen()) setTimeout(() => startTour(makeT(language), true), 700);
+      if (!tourSeen() && value.result.totalFiles > 0) setTimeout(() => startTour(makeT(language), true), 700);
       const fresh = value.result.violations.length;
-      setRecents(await api.rememberStatus(target, fresh > 0 ? 'issues' : 'clean', fresh));
+      const status = value.result.totalFiles === 0 ? 'error' : fresh > 0 ? 'issues' : 'clean';
+      setRecents(await api.rememberStatus(target, status, fresh));
     } else {
       setScan({ kind: 'fail', error: value.error });
       if (value.error.code === 'missing-config') setTab('config');
@@ -221,6 +222,12 @@ export function App() {
                   <p className="selectable">{scan.error.message}</p>
                   {scan.error.issues?.map((issue, i) => <p key={i} className="selectable">{issue.message}</p>)}
                   <button className="btn" onClick={() => setTab('config')}>{t('tabConfig')}</button>
+                </div></div>
+              ) : scan.data.result.totalFiles === 0 ? (
+                <div className="error-state"><div>
+                  <h2 className="empty">{t('emptyTitle')}</h2>
+                  <p>{t('emptyBody')}</p>
+                  <button className="btn primary" onClick={pick}>{t('openOther')}</button>
                 </div></div>
               ) : tab === 'findings' ? (
                 <Findings t={t} lang={lang} data={scan.data} root={root} toast={toasts.push} />

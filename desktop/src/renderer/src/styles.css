@@ -192,6 +192,7 @@ code, .mono { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size:
 .verdict strong { font-size: 16px; font-weight: 600; }
 .verdict strong.issues { color: var(--eosin); }
 .verdict strong.clean { color: var(--clear); }
+.verdict strong.empty, .error-state h2.empty { color: var(--iodine); }
 .verdict .facts { display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--ink-2); font-size: 12.5px; }
 .verdict .facts .warn { color: var(--iodine); }
 

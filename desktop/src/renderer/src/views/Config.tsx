@@ -48,12 +48,32 @@ function InitPanel({ t, root, overwrite, onCreated, toast }: { t: T; root: strin
   const [preset, setPreset] = useState<InitPreset>('auto');
   const [preview, setPreview] = useState<InitPreview | null>(null);
   const [busy, setBusy] = useState(false);
+  const [suggestion, setSuggestion] = useState<{ preset: InitPreset; percent: number } | null>(null);
+  const labels: Record<InitPreset, string> = { auto: t('presetAuto'), 'react-native': t('presetRN'), expo: t('presetExpo') };
 
   const load = useCallback(async () => {
+    setPreview(null);
     const res = await api.initPreview(root, preset);
     if (res.ok) setPreview(res.value); else toast(t('engineError', res.message), 'err');
   }, [root, preset, t, toast]);
   useEffect(() => { load(); }, [load]);
+
+  // Si otro punto de partida clasifica más archivos que "Detectar", se sugiere
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const results = await Promise.all((['auto', 'react-native', 'expo'] as InitPreset[]).map(async (p) => {
+        const res = await api.initPreview(root, p);
+        return res.ok && !res.value.example ? { preset: p, percent: res.value.coverage.percent } : null;
+      }));
+      if (cancelled) return;
+      const valid = results.filter((r): r is { preset: InitPreset; percent: number } => r !== null);
+      const auto = valid.find((r) => r.preset === 'auto')?.percent ?? 0;
+      const best = valid.sort((a, b) => b.percent - a.percent)[0];
+      setSuggestion(best && best.preset !== 'auto' && best.percent > auto + 1 ? best : null);
+    })();
+    return () => { cancelled = true; };
+  }, [root]);
 
   const create = async () => {
     setBusy(true);
@@ -72,15 +92,28 @@ function InitPanel({ t, root, overwrite, onCreated, toast }: { t: T; root: strin
           <button key={id} aria-pressed={preset === id} onClick={() => setPreset(id)}>{label}</button>
         ))}
       </div>
+      {suggestion && suggestion.preset !== preset && (
+        <div className="confirm" style={{ margin: '10px 0' }}>
+          <span>{t('betterPreset', labels[suggestion.preset], suggestion.percent)}</span>
+          <button className="btn primary" onClick={() => setPreset(suggestion.preset)}>{t('usePreset', labels[suggestion.preset])}</button>
+        </div>
+      )}
+      {!preview && <div className="loading" style={{ placeItems: 'start', padding: '16px 0' }}><div><div className="band" style={{ margin: '0 0 10px' }}><span /></div>{t('initLoading')}</div></div>}
       {preview && (
         <>
           <div className="meter"><span style={{ width: `${preview.coverage.percent}%` }} /></div>
           <p style={{ color: 'var(--ink-2)', fontSize: 12.5 }}>
             {t('previewCoverage', preview.coverage.percent, preview.coverage.classifiedFiles, preview.coverage.totalFiles)}
           </p>
-          {preview.example && <p className="warnline">{t('exampleWarning')}</p>}
-          <pre className="json mono selectable">{preview.json}</pre>
-          <button className="btn primary" onClick={create} disabled={busy}>{overwrite ? t('overwriteConfig') : t('createConfig')}</button>
+          {preview.coverage.totalFiles === 0 ? (
+            <p className="warnline">{t('initNoFiles')}</p>
+          ) : (
+            <>
+              {preview.example && <p className="warnline">{t('exampleWarning')}</p>}
+              <pre className="json mono selectable">{preview.json}</pre>
+              <button className="btn primary" onClick={create} disabled={busy}>{overwrite ? t('overwriteConfig') : t('createConfig')}</button>
+            </>
+          )}
         </>
       )}
     </div>
