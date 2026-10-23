@@ -75,6 +75,7 @@ export interface AutopsiaApi {
   takePendingOpen(): Promise<string | null>;
   recents(): Promise<RecentProject[]>;
   forgetRecent(root: string): Promise<RecentProject[]>;
+  renameRecent(root: string, name: string): Promise<RecentProject[]>;
   rememberStatus(root: string, status: ProjectStatus, newCount?: number): Promise<RecentProject[]>;
   watch(root: string | null): Promise<void>;
   onWatchChange(listener: (file: string) => void): () => void;

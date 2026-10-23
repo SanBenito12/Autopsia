@@ -167,13 +167,15 @@ export function App() {
     if (target === root) { setRoot(null); setScan({ kind: 'idle' }); }
   };
 
+  const rename = async (target: string, name: string) => setRecents(await api.renameRecent(target, name));
+
   const data = scan.kind === 'ok' ? scan.data : null;
 
   return (
     <div className="shell">
       <Sidebar
         t={t} lang={lang} recents={recents} current={root}
-        onOpen={openProject} onPick={pick} onForget={forget} onLang={changeLang}
+        onOpen={openProject} onPick={pick} onForget={forget} onRename={rename} onLang={changeLang}
         onTour={() => startTour(t, root !== null)}
       />
       <main className="main">
@@ -184,6 +186,8 @@ export function App() {
           <>
             <CaseHeader
               t={t} lang={lang} root={root} data={data} loading={loading}
+              name={recents.find((p) => p.root === root)?.name ?? root.split('/').pop() ?? root}
+              onRename={(name) => rename(root, name)}
               noConfig={scan.kind === 'fail' && scan.error.code === 'missing-config'}
               watching={watching} onRescan={() => runScan(root)} onToggleWatch={toggleWatch} onExport={exportReport}
             />

@@ -2,11 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import type { Lang, ScanOk } from '@shared/types';
 import { api } from '../lib/api';
 import { relativeTime, type T } from '../lib/i18n';
+import { EditableName } from './EditableName';
 
 interface Props {
   t: T;
   lang: Lang;
   root: string;
+  name: string;
   data: ScanOk | null;
   loading: boolean;
   noConfig: boolean;
@@ -14,18 +16,26 @@ interface Props {
   onRescan: () => void;
   onToggleWatch: () => void;
   onExport: (kind: 'html' | 'json') => void;
+  onRename: (name: string) => void;
 }
 
-export function CaseHeader({ t, lang, root, data, loading, noConfig, watching, onRescan, onToggleWatch, onExport }: Props) {
+export function CaseHeader({ t, lang, root, name, data, loading, noConfig, watching, onRescan, onToggleWatch, onExport, onRename }: Props) {
   const [menu, setMenu] = useState(false);
-  const name = root.split('/').pop() || root;
+  const [editing, setEditing] = useState(false);
   const home = root.replace(/^\/Users\/[^/]+/, '~');
 
   return (
     <header className="case">
       <div className="case-top">
         <div className="case-title" data-tour="title">
-          <h1 className="selectable">{name}</h1>
+          <h1 className="no-drag" title={t('renameHint')} onDoubleClick={() => setEditing(true)}>
+            <EditableName value={name} label={t('rename')} editing={editing} onSave={onRename} onDone={() => setEditing(false)} />
+            {!editing && (
+              <button className="rename-btn" aria-label={t('rename')} title={t('rename')} onClick={() => setEditing(true)}>
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 2.5l3 3L6 13H3v-3z" /></svg>
+              </button>
+            )}
+          </h1>
           <button className="path no-drag" onClick={() => api.revealInFinder(root)} title={t('reveal')}>{home}</button>
         </div>
         <div className="case-actions no-drag">

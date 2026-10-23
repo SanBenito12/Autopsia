@@ -18,6 +18,7 @@ const api: AutopsiaApi = {
   takePendingOpen: invoke('takePendingOpen') as AutopsiaApi['takePendingOpen'],
   recents: invoke('recents') as AutopsiaApi['recents'],
   forgetRecent: invoke('forgetRecent') as AutopsiaApi['forgetRecent'],
+  renameRecent: invoke('renameRecent') as AutopsiaApi['renameRecent'],
   rememberStatus: invoke('rememberStatus') as AutopsiaApi['rememberStatus'],
   watch: invoke('watch') as AutopsiaApi['watch'],
   onWatchChange(listener) {

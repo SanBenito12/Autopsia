@@ -36,6 +36,12 @@ export function setRecentStatus(root: string, status: ProjectStatus, newCount?: 
   return save(listRecents().map((p) => (p.root === root ? { ...p, status, newCount } : p)));
 }
 
+/** Un nombre vacío vuelve al nombre de la carpeta. */
+export function renameRecent(root: string, name: string): RecentProject[] {
+  const clean = name.trim().slice(0, 80) || path.basename(root);
+  return save(listRecents().map((p) => (p.root === root ? { ...p, name: clean } : p)));
+}
+
 export function forgetRecent(root: string): RecentProject[] {
   return save(listRecents().filter((p) => p.root !== root));
 }

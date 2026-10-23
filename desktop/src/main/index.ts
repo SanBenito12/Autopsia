@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { startWatcher } from '@core/watcher';
 import { EngineClient } from './engine-client';
-import { forgetRecent, listRecents, setRecentStatus, touchRecent } from './recents';
+import { forgetRecent, listRecents, renameRecent, setRecentStatus, touchRecent } from './recents';
 import type { InitPreset, Lang, MenuCommand, ProjectStatus } from '../shared/types';
 
 const engine = new EngineClient();
@@ -170,6 +170,7 @@ function registerIpc(): void {
   ipcMain.handle('recents', () => listRecents());
   ipcMain.handle('takePendingOpen', () => takePendingOpen());
   ipcMain.handle('forgetRecent', (_e, root: string) => forgetRecent(root));
+  ipcMain.handle('renameRecent', (_e, root: string, name: string) => renameRecent(root, name));
   ipcMain.handle('rememberStatus', (_e, root: string, status: ProjectStatus, newCount?: number) =>
     setRecentStatus(root, status, newCount));
   ipcMain.handle('watch', (_e, root: string | null) => {
