@@ -14,7 +14,9 @@ function npm(args, cwd) {
   return result.stdout;
 }
 try {
-  const packed = JSON.parse(npm(['pack', '--ignore-scripts', '--json', '--pack-destination', temp], root))[0];
+  // npm <= 11 prints an array; npm 12 prints an object keyed by package name.
+  const packOutput = JSON.parse(npm(['pack', '--ignore-scripts', '--json', '--pack-destination', temp], root));
+  const packed = Array.isArray(packOutput) ? packOutput[0] : Object.values(packOutput)[0];
   npm(['install', '--ignore-scripts', '--no-audit', '--no-fund', '--prefer-offline', '--prefix', temp, path.join(temp, packed.filename)], temp);
   const installed = path.join(temp, 'node_modules', 'autopsia-rn');
   const cli = path.join(installed, 'dist', 'index.js');
