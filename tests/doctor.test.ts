@@ -31,6 +31,18 @@ describe('doctor and tsconfig readiness', () => {
     expect(report.detected[0].name).toBe('domain'); expect(report.totalFiles).toBe(2);
     expect(fs.existsSync(path.join(root, 'autopsia.config.json'))).toBe(false);
   });
+  it('never borrows the default config from the current directory', () => {
+    const other = fs.mkdtempSync(path.join(os.tmpdir(), 'autopsia-cwd-'));
+    const cwd = process.cwd();
+    try {
+      fs.writeFileSync(path.join(other, 'autopsia.config.json'), JSON.stringify(config));
+      fs.unlinkSync(path.join(root, 'autopsia.config.json'));
+      process.chdir(other);
+      const report = diagnose(root);
+      expect(report.configPath).toBe(path.join(root, 'autopsia.config.json'));
+      expect(report.issues[0].code).toBe('missing-config');
+    } finally { process.chdir(cwd); fs.rmSync(other, { recursive: true, force: true }); }
+  });
   it('detects malformed configuration and empty projects', () => {
     write('autopsia.config.json', '{'); expect(diagnose(root).status).toBe('error');
     write('autopsia.config.json', config); fs.unlinkSync(path.join(root, 'App.tsx'));
@@ -44,6 +56,12 @@ describe('doctor and tsconfig readiness', () => {
     write('tsconfig.json', {}); write('App.tsx', 'export const x: number = "not a number";');
     expect(diagnose(root).status).toBe('ready');
     write('tsconfig.json', '{"compilerOptions": {'); expect(diagnose(root).status).toBe('error');
+  });
+  it('tolerates lib entries newer than the bundled TypeScript but not other invalid options', () => {
+    write('tsconfig.json', { compilerOptions: { lib: ['es2020', 'es2099.future'] } });
+    expect(loadTsconfig(root).issues).toEqual([]);
+    write('tsconfig.json', { compilerOptions: { module: 'not-a-module' } });
+    expect(loadTsconfig(root).issues.map(i => i.detail).join()).toMatch(/--module/);
   });
   it('resolves inherited aliases using TypeScript and explains unresolved targets', () => {
     write('base.json', { compilerOptions: { baseUrl: '.', paths: { '@/*': ['src/*'] } } });

@@ -4,12 +4,14 @@ import { checkDirectDataAccess } from './direct-data-access';
 import { checkForbiddenExternal } from './forbidden-external';
 import { checkCircularDeps } from './circular-deps';
 import { checkFeatureBoundaries } from './feature-boundaries';
+import { checkCodeFacts } from './react-native';
 
 /**
  * Ejecuta las reglas respetando la sección "rules" del config:
  *   "rules": { "dependency-direction": "error" | "warning" | "off" }
- * Default: todo "error" (el comportamiento de siempre). "warning" se
- * reporta pero no falla --ci; "off" ni siquiera corre la regla.
+ * Default: "error" para las reglas de arquitectura y "warning" para las de
+ * calidad de React Native. "warning" se reporta pero no falla --ci; "off" ni
+ * siquiera corre la regla.
  */
 
 export const ALL_RULES = [
@@ -18,12 +20,24 @@ export const ALL_RULES = [
   'forbidden-external',
   'circular-deps',
   'feature-boundaries',
+  'scrollview-map',
+  'flatlist-performance',
+  'component-size',
 ] as const;
 
 export type RuleName = (typeof ALL_RULES)[number];
 
+/** Las reglas de calidad son recomendaciones: avisan sin romper el CI salvo que se pidan como error. */
+const DEFAULT_LEVELS: Partial<Record<RuleName, RuleLevel>> = {
+  'scrollview-map': 'warning',
+  'flatlist-performance': 'warning',
+  'component-size': 'warning',
+};
+
+export const defaultLevel = (rule: RuleName): RuleLevel => DEFAULT_LEVELS[rule] ?? 'error';
+
 export function ruleLevel(config: AutopsiaConfig, rule: RuleName): RuleLevel {
-  return config.rules?.[rule] ?? 'error';
+  return config.rules?.[rule] ?? defaultLevel(rule);
 }
 
 export function runRules(graph: FileNode[], config: AutopsiaConfig): Violation[] {
@@ -33,6 +47,9 @@ export function runRules(graph: FileNode[], config: AutopsiaConfig): Violation[]
     'forbidden-external': () => checkForbiddenExternal(graph, config),
     'circular-deps': () => checkCircularDeps(graph),
     'feature-boundaries': () => checkFeatureBoundaries(graph, config),
+    'scrollview-map': () => checkCodeFacts(graph, 'scrollview-map'),
+    'flatlist-performance': () => checkCodeFacts(graph, 'flatlist-performance'),
+    'component-size': () => checkCodeFacts(graph, 'component-size'),
   };
 
   const violations: Violation[] = [];
@@ -40,7 +57,7 @@ export function runRules(graph: FileNode[], config: AutopsiaConfig): Violation[]
     const level = ruleLevel(config, rule);
     if (level === 'off') continue;
     for (const v of runners[rule]()) {
-      violations.push(level === 'warning' ? { ...v, severity: 'warning' } : v);
+      violations.push({ ...v, severity: level });
     }
   }
   return violations;

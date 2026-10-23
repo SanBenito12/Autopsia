@@ -3,7 +3,7 @@ import chalk from 'chalk';
 import * as fs from 'fs';
 import * as path from 'path';
 import { AutopsiaConfig, LayerConfig, RuleLevel } from './types';
-import { ALL_RULES } from './rules/run';
+import { ALL_RULES, defaultLevel } from './rules/run';
 import { buildGraph } from './scanner';
 import { loadTsconfig } from './tsconfig';
 
@@ -186,7 +186,7 @@ export function buildConfig(detected: DetectedLayer[], root?: string): AutopsiaC
   });
 
   const rules: Record<string, RuleLevel> = {};
-  for (const rule of ALL_RULES) rules[rule] = 'error';
+  for (const rule of ALL_RULES) rules[rule] = defaultLevel(rule);
 
   const config: AutopsiaConfig = {
     layers,
@@ -196,7 +196,10 @@ export function buildConfig(detected: DetectedLayer[], root?: string): AutopsiaC
     strict: true,
   };
 
-  const featurePatterns = detectFeaturesPatterns(root);
+  const hasLayeredFeatures = detected.some((d) =>
+    d.folders.some((f) => f.startsWith('features/') || f.startsWith('modules/'))
+  );
+  const featurePatterns = hasLayeredFeatures ? [] : detectFeaturesPatterns(root);
   if (featurePatterns.length > 0) {
     config.features = {
       patterns: featurePatterns,
@@ -255,7 +258,7 @@ export function buildExpoConfig(root: string): AutopsiaConfig {
   }
 
   const rules: Record<string, RuleLevel> = {};
-  for (const rule of ALL_RULES) rules[rule] = 'error';
+  for (const rule of ALL_RULES) rules[rule] = defaultLevel(rule);
   const { dataAccessModules } = detectPackageJsonDataAccess(root);
 
   const config: AutopsiaConfig = {
@@ -300,26 +303,44 @@ export function buildReactNativeConfig(root: string): AutopsiaConfig {
     if (found) { if (!found.folders.includes(folder)) found.folders.push(folder); }
     else detected.push({ name, folders: [folder] });
   };
+  const hasOnlyDotfiles = (folder: string): boolean => {
+    const entries = fs.readdirSync(folder, { withFileTypes: true });
+    return entries.length > 0 && entries.every(e => e.isFile() && e.name.startsWith('.'));
+  };
   const children = (folder: string): string[] => fs.existsSync(folder) && fs.statSync(folder).isDirectory()
-    ? fs.readdirSync(folder, { withFileTypes: true }).filter(e => e.isDirectory()).map(e => e.name).sort() : [];
+    ? fs.readdirSync(folder, { withFileTypes: true })
+        .filter(e => e.isDirectory() && !hasOnlyDotfiles(path.join(folder, e.name)))
+        .map(e => e.name)
+        .sort()
+    : [];
   const scopes = [
     '',
     ...children(path.join(root, 'src/features')).map(f => `features/${f}/`),
     ...children(path.join(root, 'src/modules')).map(m => `modules/${m}/`),
   ];
+  const sharedLayerByFolder: Record<string, string> = {
+    presentation: 'presentation', ui: 'presentation', screens: 'presentation', views: 'presentation',
+    components: 'presentation', hooks: 'presentation', navigation: 'presentation', theme: 'presentation',
+    domain: 'domain', core: 'domain',
+    data: 'data', repositories: 'data',
+    infrastructure: 'infrastructure', infra: 'infrastructure', services: 'infrastructure',
+    api: 'infrastructure', clients: 'infrastructure', storage: 'infrastructure',
+    application: 'application', usecases: 'application', 'use-cases': 'application',
+  };
   for (const scope of scopes) {
     const scopeChildren = children(path.join(root, 'src', scope));
     for (const appFolder of ['application', 'usecases', 'use-cases']) {
       if (scopeChildren.includes(appFolder)) add('application', `${scope}${appFolder}`);
     }
-    for (const uiFolder of ['components', 'hooks', 'navigation']) {
+    for (const uiFolder of ['components', 'hooks', 'navigation', 'theme']) {
       if (scopeChildren.includes(uiFolder)) add('presentation', `${scope}${uiFolder}`);
     }
     for (const infraFolder of ['api', 'clients', 'storage']) {
       if (scopeChildren.includes(infraFolder)) add('infrastructure', `${scope}${infraFolder}`);
     }
     for (const name of children(path.join(root, 'src', scope, 'shared'))) {
-      if (['presentation', 'domain', 'data', 'infrastructure', 'application'].includes(name)) add(name, `${scope}shared/${name}`);
+      const targetLayer = sharedLayerByFolder[name.toLowerCase()];
+      if (targetLayer) add(targetLayer, `${scope}shared/${name}`);
     }
   }
   for (const folder of ['app', 'di']) if (children(path.join(root, 'src')).includes(folder)) add('composition', folder);

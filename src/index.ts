@@ -4,17 +4,14 @@ import { Command, CommanderError } from 'commander';
 import chalk from 'chalk';
 import * as fs from 'fs';
 import * as path from 'path';
-import { AutopsiaConfig, ScanResult, Violation } from './types';
-import { applyBaseline, loadBaseline, printBaselineSaved, saveBaseline } from './baseline';
-import { buildGraph } from './scanner';
-import { runRules } from './rules/run';
-import { computeHealth, printReport, writeJson, printGitHubAnnotations, writeGitHubSummary } from './reporter';
+import { ScanResult } from './types';
+import { printBaselineSaved, saveBaseline } from './baseline';
+import { printReport, writeJson, printGitHubAnnotations, writeGitHubSummary } from './reporter';
 import { openInBrowser, writeHtml } from './viewer';
 import { runInit } from './init';
-import { computeAnalysisCoverage, validateConfig } from './analysis';
 import { compareReports, loadReport, printComparison } from './compare';
-import { loadTsconfig } from './tsconfig';
-import { diagnose, printDoctor, resolveConfigPath } from './doctor';
+import { diagnose, printDoctor } from './doctor';
+import { scanProject } from './scan';
 import { setupCi } from './setup-ci';
 import { startWatcher } from './watcher';
 
@@ -72,7 +69,6 @@ export interface ScanOptions {
 }
 
 export function executeScan(scanPath: string, opts: ScanOptions): { exitCode: number; result?: ScanResult } {
-  const root = path.resolve(scanPath);
   let previous: ScanResult | undefined;
   if (opts.compare) {
     try {
@@ -82,88 +78,33 @@ export function executeScan(scanPath: string, opts: ScanOptions): { exitCode: nu
       return { exitCode: 2 };
     }
   }
-  if (!fs.existsSync(root)) {
-    console.error(chalk.red(t('cli.missingPath', { p0: root })));
+
+  const outcome = scanProject(scanPath, {
+    config: opts.config,
+    tsconfig: opts.tsconfig,
+    baseline: opts.baseline,
+    onScanStart: (root) => console.log(chalk.gray(t('cli.scanning', { p0: root }))),
+  });
+
+  if (!outcome.ok) {
+    const { error } = outcome;
+    if (error.code === 'invalid-config') {
+      console.error(chalk.red.bold(error.message));
+      for (const issue of error.issues ?? []) console.error(chalk.red(`  - ${present(issue).message}`));
+      console.error('');
+    } else {
+      console.error(chalk.red(error.message));
+      if (error.code === 'missing-config') {
+        console.error(chalk.gray(t('cli.initHint', {})));
+        console.error(chalk.bold(`    npx autopsia-rn init ${scanPath}`));
+        console.error(chalk.bold(`    npx autopsia-rn scan ${scanPath}`));
+      }
+    }
     return { exitCode: 2 };
   }
 
-  const configPath = resolveConfigPath(root, opts.config);
-
-  if (!fs.existsSync(configPath)) {
-    console.error(chalk.red(t('cli.missingConfig', { p0: root })));
-    console.error(chalk.gray(t('cli.initHint', {})));
-    console.error(chalk.bold(`    npx autopsia-rn init ${scanPath}`));
-    console.error(chalk.bold(`    npx autopsia-rn scan ${scanPath}`));
-    return { exitCode: 2 };
-  }
-
-  let config: AutopsiaConfig;
-  try {
-    config = JSON.parse(fs.readFileSync(configPath, 'utf-8')) as AutopsiaConfig;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error(chalk.red(t('cli.readError', { p0: message })));
-    return { exitCode: 2 };
-  }
-  const configIssues = validateConfig(config);
-  if (configIssues.length > 0) {
-    console.error(chalk.red.bold(t('cli.invalidConfig', {})));
-    for (const issue of configIssues) console.error(chalk.red(`  - ${present(issue).message}`));
-    console.error('');
-    return { exitCode: 2 };
-  }
-
-  if (opts.tsconfig && !fs.existsSync(path.resolve(opts.tsconfig))) {
-    console.error(chalk.red(t('cli.missingTsconfig', { p0: path.resolve(opts.tsconfig) })));
-    return { exitCode: 2 };
-  }
-
-  console.log(chalk.gray(t('cli.scanning', { p0: root })));
-  const graph = buildGraph(root, config, opts.tsconfig);
-  const analysis = computeAnalysisCoverage(graph, config, [
-    ...configIssues,
-    ...loadTsconfig(root, opts.tsconfig).issues,
-  ]);
-
-  const rawViolations = runRules(graph, config);
-
-  // Comentarios autopsia-ignore: las suprimidas solo se cuentan
-  const suppressedCount = rawViolations.filter((v) => v.suppressed).length;
-  const allViolations = rawViolations.filter((v) => !v.suppressed);
-
-  // Baseline: las violaciones ya registradas se toleran; solo las nuevas cuentan
-  let violations = allViolations;
-  let tolerated: Violation[] | undefined;
-  const baseline = opts.baseline === false ? null : loadBaseline(root);
-  if (baseline) {
-    const split = applyBaseline(allViolations, baseline);
-    violations = split.fresh;
-    tolerated = split.tolerated;
-  }
-
-  const filesByLayer: Record<string, number> = {};
-  for (const layer of config.layers) filesByLayer[layer.name] = 0;
-  for (const node of graph) {
-    if (node.layer) filesByLayer[node.layer] = (filesByLayer[node.layer] ?? 0) + 1;
-  }
-
-  const partial = {
-    scannedAt: new Date().toISOString(),
-    root,
-    totalFiles: graph.length,
-    filesByLayer,
-    violations,
-    tolerated,
-    suppressedCount: suppressedCount > 0 ? suppressedCount : undefined,
-    graph,
-    analysis,
-  };
-
-  // La salud refleja TODAS las violaciones (también las toleradas)
-  const result: ScanResult = {
-    ...partial,
-    healthByLayer: computeHealth({ ...partial, violations: allViolations }),
-  };
+  const { result, config, allViolations } = outcome;
+  const { root, violations, analysis } = result;
 
   if (opts.format !== 'github') {
     printReport(result);
@@ -198,7 +139,7 @@ export function executeScan(scanPath: string, opts: ScanOptions): { exitCode: nu
 
   const shouldFail =
     opts.ci &&
-    (violations.some((v) => v.severity === 'error') || (config.strict === true && !analysis.complete));
+    (violations.some((v) => v.severity === 'error') || (config.strict === true && analysis?.complete !== true));
 
   return { exitCode: shouldFail ? 1 : 0, result };
 }

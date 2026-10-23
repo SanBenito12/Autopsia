@@ -4,3 +4,5 @@ reporte.json
 demo/
 *.log
 .DS_Store
+desktop/out/
+desktop/release/

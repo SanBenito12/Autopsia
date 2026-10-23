@@ -66,6 +66,13 @@ export function validateConfig(config: AutopsiaConfig): AnalysisIssue[] {
       });
     }
   }
+  if (config.limits !== undefined) {
+    const limits = config.limits as Record<string, unknown> | null;
+    const positive = (value: unknown) => value === undefined || (Number.isInteger(value) && (value as number) > 0);
+    if (!limits || typeof limits !== 'object' || Array.isArray(limits) || !positive(limits.componentLines) || !positive(limits.hookLines)) {
+      issues.push({ diagnostic: { message: { code: "config.limits", params: {} } }, kind: 'invalid-config', message: format("config.limits", {}, "es") });
+    }
+  }
   if (config.rules !== undefined && (typeof config.rules !== 'object' || config.rules === null || Array.isArray(config.rules))) {
     issues.push({ diagnostic: { message: { code: "config.rules", params: {} } }, kind: 'invalid-config', message: format("config.rules", {}, "es") });
   }

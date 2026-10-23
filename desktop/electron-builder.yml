@@ -1,0 +1,24 @@
+appId: dev.autopsia.desktop
+productName: Autopsia
+directories:
+  buildResources: build
+  output: release
+files:
+  - out/**
+  - package.json
+asarUnpack:
+  - node_modules/typescript/**
+mac:
+  category: public.app-category.developer-tools
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+  icon: build/icon.icns
+  identity: null
+  extendInfo:
+    CFBundleDocumentTypes:
+      - CFBundleTypeName: Folder
+        CFBundleTypeRole: Viewer
+        LSItemContentTypes: [public.folder]
+dmg:
+  title: Autopsia
