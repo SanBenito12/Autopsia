@@ -189,6 +189,8 @@ app.on('open-file', (event, target) => {
 });
 app.whenReady().then(() => {
   nativeTheme.themeSource = 'system';
+  // Empaquetada, el icono viene del .icns; en desarrollo el Dock mostraría el de Electron
+  if (!app.isPackaged) app.dock?.setIcon(path.join(__dirname, '../../build/icon.png'));
   buildMenu();
   registerIpc();
   createWindow();
