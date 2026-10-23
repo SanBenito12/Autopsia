@@ -57,6 +57,12 @@ describe('doctor and tsconfig readiness', () => {
     expect(diagnose(root).status).toBe('ready');
     write('tsconfig.json', '{"compilerOptions": {'); expect(diagnose(root).status).toBe('error');
   });
+  it('tolerates lib entries newer than the bundled TypeScript but not other invalid options', () => {
+    write('tsconfig.json', { compilerOptions: { lib: ['es2020', 'es2099.future'] } });
+    expect(loadTsconfig(root).issues).toEqual([]);
+    write('tsconfig.json', { compilerOptions: { module: 'not-a-module' } });
+    expect(loadTsconfig(root).issues.map(i => i.detail).join()).toMatch(/--module/);
+  });
   it('resolves inherited aliases using TypeScript and explains unresolved targets', () => {
     write('base.json', { compilerOptions: { baseUrl: '.', paths: { '@/*': ['src/*'] } } });
     write('tsconfig.json', { extends: './base.json' }); write('src/model.ts', 'export const model = 1;');

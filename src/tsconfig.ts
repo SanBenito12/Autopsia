@@ -29,7 +29,9 @@ export function loadTsconfig(root: string, explicit?: string): LoadedTsconfig {
   const basePath = path.dirname(filename).replace(/\\/g, '/');
   const parsed = read.error ? undefined : ts.parseJsonConfigFileContent(read.config, ts.sys, basePath, undefined, filename);
   // Autopsia selects its own TS/TSX files: an empty include/files set is not a loading failure.
-  const diagnostics = read.error ? [read.error] : (parsed?.errors ?? []).filter(d => d.code !== 18003 && d.code !== 18002);
+  // A `lib` newer than the bundled TypeScript (TS6046 on --lib) cannot change how imports resolve.
+  const isUnknownLib = (d: ts.Diagnostic) => d.code === 6046 && ts.flattenDiagnosticMessageText(d.messageText, '\n').includes("'--lib'");
+  const diagnostics = read.error ? [read.error] : (parsed?.errors ?? []).filter(d => d.code !== 18003 && d.code !== 18002 && !isUnknownLib(d));
   const options: ts.CompilerOptions = parsed?.options
     ? { ...parsed.options, moduleSuffixes: parsed.options.moduleSuffixes ?? RN_MODULE_SUFFIXES }
     : fallback;
