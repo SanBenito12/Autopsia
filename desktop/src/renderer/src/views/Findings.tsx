@@ -7,14 +7,64 @@ import type { PushToast } from '../components/Toasts';
 import { guideFor, ignoreComment, rulesDocUrl } from '../lib/guides';
 
 type Filter = 'all' | 'new' | 'tolerated';
+export type Category = 'all' | 'arch' | 'perf' | 'safety' | 'ui';
+const ARCH_RULES = new Set([
+  'dependency-direction',
+  'direct-data-access',
+  'forbidden-external',
+  'circular-deps',
+  'feature-boundaries',
+]);
+const PERF_RULES = new Set([
+  'memory-leak',
+  'render-bottleneck',
+  'scrollview-map',
+  'flatlist-performance',
+]);
+const SAFETY_RULES = new Set(['runtime-safety']);
+const UI_RULES = new Set([
+  'scrollview-map',
+  'flatlist-performance',
+  'component-size',
+  'memory-leak',
+  'render-bottleneck',
+  'runtime-safety',
+]);
 interface Item { v: Violation; tolerated: boolean; key: string }
 
-export function Findings({ t, lang, data, root, toast, onDoctor }: { t: T; lang: Lang; data: ScanOk; root: string; toast: PushToast; onDoctor: () => void }) {
+export function Findings({
+  t,
+  lang,
+  data,
+  root,
+  toast,
+  onDoctor,
+  flowFilter,
+  onFlowFilter,
+  categoryFilter,
+  onCategoryFilter,
+}: {
+  t: T;
+  lang: Lang;
+  data: ScanOk;
+  root: string;
+  toast: PushToast;
+  onDoctor: () => void;
+  flowFilter?: string | null;
+  onFlowFilter?: (flow: string | null) => void;
+  categoryFilter?: Category;
+  onCategoryFilter?: (cat: Category) => void;
+}) {
   const { result } = data;
   const [filter, setFilter] = useState<Filter>('all');
+  const [localCategory, setLocalCategory] = useState<Category>('all');
+  const category = categoryFilter ?? localCategory;
+  const setCategory = onCategoryFilter ?? setLocalCategory;
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<string | null>(null);
   const [comparison, setComparison] = useState<ReportComparison | null>(null);
+  const flowByFile = result.readiness?.flowByFile ?? {};
+  const flows = result.readiness?.features ?? [];
 
   const items = useMemo<Item[]>(() => {
     const make = (list: Violation[] | undefined, tolerated: boolean) =>
@@ -24,10 +74,22 @@ export function Findings({ t, lang, data, root, toast, onDoctor }: { t: T; lang:
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return items.filter(({ v, tolerated }) =>
-      (filter === 'all' || (filter === 'new') !== tolerated) &&
-      (!q || v.file.toLowerCase().includes(q) || v.message.toLowerCase().includes(q) || (v.detail ?? '').toLowerCase().includes(q)));
-  }, [items, filter, query]);
+    return items.filter(({ v, tolerated }) => {
+      const catOk =
+        category === 'all' ||
+        (category === 'arch' && ARCH_RULES.has(v.rule)) ||
+        (category === 'perf' && PERF_RULES.has(v.rule)) ||
+        (category === 'safety' && SAFETY_RULES.has(v.rule)) ||
+        (category === 'ui' && UI_RULES.has(v.rule));
+      const flowOk = !flowFilter || flowByFile[v.file] === flowFilter;
+      return (
+        catOk &&
+        flowOk &&
+        (filter === 'all' || (filter === 'new') !== tolerated) &&
+        (!q || v.file.toLowerCase().includes(q) || v.message.toLowerCase().includes(q) || (v.detail ?? '').toLowerCase().includes(q))
+      );
+    });
+  }, [items, filter, category, flowFilter, flowByFile, query]);
 
   const groups = useMemo(() => {
     const map = new Map<string, Item[]>();
@@ -62,7 +124,7 @@ export function Findings({ t, lang, data, root, toast, onDoctor }: { t: T; lang:
     else if (res.value) setComparison(res.value);
   };
 
-  const issues = result.analysis?.issues ?? [];
+  const issues = [...(result.analysis?.issues ?? []), ...(result.configWarnings ?? [])];
   const current = items.find((i) => i.key === selected);
 
   if (items.length === 0) {
@@ -86,6 +148,35 @@ export function Findings({ t, lang, data, root, toast, onDoctor }: { t: T; lang:
               </button>
             ))}
           </div>
+          <div className="seg" role="group">
+            {(['all', 'arch', 'perf', 'safety', 'ui'] as Category[]).map((c) => (
+              <button key={c} aria-pressed={category === c} onClick={() => setCategory(c)}>
+                {c === 'all'
+                  ? t('categoryAll')
+                  : c === 'arch'
+                    ? t('categoryArch')
+                    : c === 'perf'
+                      ? t('categoryPerf')
+                      : c === 'safety'
+                        ? t('categorySafety')
+                        : t('categoryUi')}
+              </button>
+            ))}
+          </div>
+          {flows.length > 0 && (
+            <select
+              className="flow-select"
+              value={flowFilter ?? ''}
+              onChange={(e) => onFlowFilter?.(e.target.value || null)}
+            >
+              <option value="">{t('allFlows')}</option>
+              {flows.map((f) => (
+                <option key={f.name} value={f.name}>
+                  {f.name} ({f.architectureViolations + f.uiWarnings})
+                </option>
+              ))}
+            </select>
+          )}
           <input className="search" placeholder={t('search')} value={query} onChange={(e) => setQuery(e.target.value)} />
           <button className="btn quiet" onClick={compare}>{t('compare')}</button>
         </div>
@@ -158,6 +249,23 @@ function Detail({ t, lang, item, root, toast }: { t: T; lang: Lang; item: Item; 
           <h3>{t('howToFix')}</h3>
           {guide.hint && <p className="hint">{guide.hint}</p>}
           <ul>{guide.fixes.map((fix, i) => <li key={i}>{fix}</li>)}</ul>
+          {(guide.badCode || guide.goodCode) && (
+            <div className="code-diff">
+              <h4>{t('codeExampleTitle')}</h4>
+              {guide.badCode && (
+                <div className="code-box bad">
+                  <span className="code-label">{t('codeBadLabel')}</span>
+                  <pre className="mono">{guide.badCode}</pre>
+                </div>
+              )}
+              {guide.goodCode && (
+                <div className="code-box good">
+                  <span className="code-label">{t('codeGoodLabel')}</span>
+                  <pre className="mono">{guide.goodCode}</pre>
+                </div>
+              )}
+            </div>
+          )}
           <h4>{t('whyMatters')}</h4>
           <p>{guide.why}</p>
           <pre className="mono">{ignoreComment(lang, v)}</pre>

@@ -1,6 +1,34 @@
-import type { AnalysisIssue, ReportComparison, ScanResult, Violation } from '../../../src/types';
+import type {
+  AnalysisIssue,
+  CleanArchVerdict,
+  FeatureHealth,
+  PhaseStatus,
+  ProjectReadiness,
+  ReadinessPhase,
+  ReadinessPhaseId,
+  RemediationPriority,
+  RemediationStep,
+  RemediationStepId,
+  ReportComparison,
+  ScanResult,
+  Violation,
+} from '../../../src/types';
 
-export type { AnalysisIssue, ReportComparison, ScanResult, Violation };
+export type {
+  AnalysisIssue,
+  CleanArchVerdict,
+  FeatureHealth,
+  PhaseStatus,
+  ProjectReadiness,
+  ReadinessPhase,
+  ReadinessPhaseId,
+  RemediationPriority,
+  RemediationStep,
+  RemediationStepId,
+  ReportComparison,
+  ScanResult,
+  Violation,
+};
 export type Lang = 'es' | 'en';
 export type InitPreset = 'auto' | 'react-native' | 'expo';
 
@@ -48,6 +76,7 @@ export interface DoctorView {
   classifiedFiles: number | null;
   detected: { name: string; folders: string[] }[];
   issues: DoctorIssueView[];
+  warnings?: DoctorIssueView[];
 }
 
 export interface InitPreview {

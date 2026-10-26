@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Lang, ScanOk } from '@shared/types';
+import type { CleanArchVerdict, Lang, ReadinessPhase, ScanOk } from '@shared/types';
 import { api } from '../lib/api';
-import { relativeTime, type T } from '../lib/i18n';
+import { relativeTime, type Key, type T } from '../lib/i18n';
 import { EditableName } from './EditableName';
 
 interface Props {
@@ -17,9 +17,10 @@ interface Props {
   onToggleWatch: () => void;
   onExport: (kind: 'html' | 'json') => void;
   onRename: (name: string) => void;
+  onSelectTab?: (tab: 'findings' | 'doctor') => void;
 }
 
-export function CaseHeader({ t, lang, root, name, data, loading, noConfig, watching, onRescan, onToggleWatch, onExport, onRename }: Props) {
+export function CaseHeader({ t, lang, root, name, data, loading, noConfig, watching, onRescan, onToggleWatch, onExport, onRename, onSelectTab }: Props) {
   const [menu, setMenu] = useState(false);
   const [editing, setEditing] = useState(false);
   const home = root.replace(/^\/Users\/[^/]+/, '~');
@@ -57,7 +58,7 @@ export function CaseHeader({ t, lang, root, name, data, loading, noConfig, watch
       </div>
       {data && (
         <div className="summary">
-          <Verdict t={t} lang={lang} data={data} />
+          <Verdict t={t} lang={lang} data={data} onSelectTab={onSelectTab} />
           {data.result.totalFiles > 0 && <LayerBars t={t} data={data} />}
         </div>
       )}
@@ -65,11 +66,26 @@ export function CaseHeader({ t, lang, root, name, data, loading, noConfig, watch
   );
 }
 
-function Verdict({ t, lang, data }: { t: T; lang: Lang; data: ScanOk }) {
+const VERDICT_KEYS: Record<CleanArchVerdict, Key> = {
+  verified: 'verdictBadgeVerified',
+  partial: 'verdictBadgePartial',
+  failing: 'verdictBadgeFailing',
+  unverified: 'verdictBadgeUnverified',
+};
+
+const PHASE_KEYS: Record<ReadinessPhase['id'], { short: Key; desc: Key }> = {
+  foundation: { short: 'phaseFoundation', desc: 'phaseFoundationDesc' },
+  architecture: { short: 'phaseArchitecture', desc: 'phaseArchitectureDesc' },
+  flows: { short: 'phaseFlows', desc: 'phaseFlowsDesc' },
+  production: { short: 'phaseProduction', desc: 'phaseProductionDesc' },
+};
+
+function Verdict({ t, lang, data, onSelectTab }: { t: T; lang: Lang; data: ScanOk; onSelectTab?: (tab: 'findings' | 'doctor') => void }) {
   const { result } = data;
   const fresh = result.violations.length;
   const tolerated = result.tolerated?.length ?? 0;
   const incomplete = result.analysis?.complete === false;
+  const readiness = result.readiness;
   if (result.totalFiles === 0) {
     return (
       <div className="verdict" data-tour="verdict">
@@ -83,6 +99,31 @@ function Verdict({ t, lang, data }: { t: T; lang: Lang; data: ScanOk }) {
         <span className={`stat-num ${fresh ? 'issues' : 'clean'}`}>{fresh}</span>
         <span className="stat-label">{fresh === 1 ? t('statNewOne') : t('statNew')}</span>
       </div>
+      {readiness && (
+        <div className="readiness-strip">
+          <button
+            className={`arch-pill ${readiness.cleanArchVerdict}`}
+            onClick={() => onSelectTab?.('doctor')}
+          >
+            <span className="dot-ind" />
+            {t(VERDICT_KEYS[readiness.cleanArchVerdict])}
+          </button>
+          <div className="phase-pills">
+            {readiness.phases.map((p) => (
+              <button
+                key={p.id}
+                className={`phase-pill ${p.status}`}
+                title={t(PHASE_KEYS[p.id].desc)}
+                onClick={() => onSelectTab?.(p.id === 'architecture' || p.id === 'flows' ? 'findings' : 'doctor')}
+              >
+                <span className="dot-ind" />
+                <span>{t(PHASE_KEYS[p.id].short)}</span>
+                {p.issuesCount > 0 && <span className="p-count">{p.issuesCount}</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <dl className="stats">
         <div className={incomplete ? 'warn' : ''} title={incomplete ? t('incomplete') : undefined}>
           <dt>{t('statCoverage')}</dt><dd>{data.coveragePercent}%</dd>

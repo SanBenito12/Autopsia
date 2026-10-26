@@ -7,7 +7,7 @@ import { Sidebar } from './components/Sidebar';
 import { CaseHeader } from './components/CaseHeader';
 import { Toasts, useToasts } from './components/Toasts';
 import { Welcome } from './views/Welcome';
-import { Findings } from './views/Findings';
+import { Findings, type Category } from './views/Findings';
 import { Graph } from './views/Graph';
 import { Doctor } from './views/Doctor';
 import { Config } from './views/Config';
@@ -35,6 +35,8 @@ export function App() {
   const [scan, setScan] = useState<ScanState>({ kind: 'idle' });
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState<Tab>('findings');
+  const [flowFilter, setFlowFilter] = useState<string | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<Category>('all');
   const [watching, setWatching] = useState(false);
   const [dragging, setDragging] = useState(false);
   const toasts = useToasts();
@@ -81,6 +83,7 @@ export function App() {
     setRoot(target);
     setScan({ kind: 'idle' });
     setTab('findings');
+    setFlowFilter(null);
     setWatching(false);
     await api.watch(null);
     await runScan(target);
@@ -190,6 +193,7 @@ export function App() {
               onRename={(name) => rename(root, name)}
               noConfig={scan.kind === 'fail' && scan.error.code === 'missing-config'}
               watching={watching} onRescan={() => runScan(root)} onToggleWatch={toggleWatch} onExport={exportReport}
+              onSelectTab={(nextTab) => setTab(nextTab)}
             />
             <nav className="tabs" role="tablist">
               {([
@@ -211,7 +215,11 @@ export function App() {
                     configPath={data?.configPath ?? (scan.kind === 'fail' ? scan.error.configPath : undefined)}
                     onChanged={() => runScan(root)} toast={toasts.push} />
                 ) : (
-                  <Doctor t={t} lang={lang} root={root} />
+                  <Doctor
+                    t={t} lang={lang} root={root} data={data}
+                    onSelectFlow={(flow) => { setFlowFilter(flow); setCategoryFilter('all'); setTab('findings'); }}
+                    onSelectCategory={(cat) => { setCategoryFilter(cat); setFlowFilter(null); setTab('findings'); }}
+                  />
                 )
               ) : scan.kind === 'idle' || (loading && !data) ? (
                 <div className="loading"><div><div className="band"><span /></div>{t('scanning')}</div></div>
@@ -234,7 +242,11 @@ export function App() {
                   <button className="btn primary" onClick={pick}>{t('openOther')}</button>
                 </div></div>
               ) : tab === 'findings' ? (
-                <Findings t={t} lang={lang} data={scan.data} root={root} toast={toasts.push} onDoctor={() => setTab('doctor')} />
+                <Findings
+                  t={t} lang={lang} data={scan.data} root={root} toast={toasts.push}
+                  onDoctor={() => setTab('doctor')} flowFilter={flowFilter} onFlowFilter={setFlowFilter}
+                  categoryFilter={categoryFilter} onCategoryFilter={setCategoryFilter}
+                />
               ) : (
                 <Graph t={t} data={scan.data} root={root} />
               )}

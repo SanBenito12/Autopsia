@@ -10,6 +10,7 @@ import { computeAnalysisCoverage, validateConfig } from './analysis';
 import { loadTsconfig } from './tsconfig';
 import { resolveConfigPath } from './doctor';
 import { detectConfigSmells } from './smells';
+import { computeReadiness } from './readiness';
 
 /**
  * Núcleo del escaneo sin salida por consola. Lo usan la CLI (executeScan)
@@ -115,9 +116,14 @@ export function scanProject(scanPath: string, opts: ScanProjectOptions = {}): Sc
   };
 
   // La salud refleja TODAS las violaciones (también las toleradas)
-  const result: ScanResult = {
+  const baseResult: Omit<ScanResult, 'readiness'> = {
     ...partial,
     healthByLayer: computeHealth({ ...partial, violations: allViolations }),
+  };
+
+  const result: ScanResult = {
+    ...baseResult,
+    readiness: computeReadiness(baseResult, config),
   };
 
   return { ok: true, result, config, configPath, allViolations };

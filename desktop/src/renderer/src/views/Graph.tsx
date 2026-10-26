@@ -14,11 +14,21 @@ export function Graph({ t, data, root }: { t: T; data: ScanOk; root: string }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const zoomRef = useRef<{ reset: () => void; focus: (id: string) => void } | null>(null);
   const [hidden, setHidden] = useState<Set<string>>(new Set());
+  const [onlyViolations, setOnlyViolations] = useState(false);
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<string | null>(null);
 
   const badFiles = useMemo(() => new Set(result.violations.map((v) => v.file)), [result]);
   const edgeSet = useMemo(() => new Set(edges), [edges]);
+  const involvedInViolation = useMemo(() => {
+    const set = new Set<string>(badFiles);
+    for (const edge of edges) {
+      const [s, tg] = edge.split('|');
+      if (s) set.add(s);
+      if (tg) set.add(tg);
+    }
+    return set;
+  }, [badFiles, edges]);
 
   // Construye la simulación una vez por escaneo
   useEffect(() => {
@@ -187,7 +197,7 @@ export function Graph({ t, data, root }: { t: T; data: ScanOk; root: string }) {
   useEffect(() => {
     const svg = d3.select(svgRef.current!);
     const q = query.trim().toLowerCase();
-    const visible = (d: Node) => !hidden.has(d.layer ?? '∅');
+    const visible = (d: Node) => !hidden.has(d.layer ?? '∅') && (!onlyViolations || involvedInViolation.has(d.id));
     const neighbors = new Set<string>();
     if (selected) {
       neighbors.add(selected);
@@ -214,7 +224,7 @@ export function Graph({ t, data, root }: { t: T; data: ScanOk; root: string }) {
         if (selected) return s === selected || tg === selected ? 1 : 0.1;
         return q && dim(d.source as Node) && dim(d.target as Node) ? 0.1 : 1;
       });
-  }, [hidden, query, selected, result]);
+  }, [hidden, onlyViolations, involvedInViolation, query, selected, result]);
 
   const toggle = (layer: string) => setHidden((prev) => {
     const next = new Set(prev);
@@ -243,6 +253,13 @@ export function Graph({ t, data, root }: { t: T; data: ScanOk; root: string }) {
               <i style={{ background: 'var(--layer-none)' }} />{t('graphUnclassified')}
             </button>
           )}
+          <button
+            className="chip"
+            aria-pressed={onlyViolations}
+            onClick={() => setOnlyViolations((v) => !v)}
+          >
+            <i style={{ background: 'var(--eosin)' }} />{t('onlyViolations')}
+          </button>
         </div>
         <input className="search" placeholder={t('graphSearch')} value={query} onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {

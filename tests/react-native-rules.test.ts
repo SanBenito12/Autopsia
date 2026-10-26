@@ -6,6 +6,7 @@ import { buildGraph } from '../src/scanner';
 import { runRules } from '../src/rules/run';
 import { detectConfigSmells } from '../src/smells';
 import { validateConfig } from '../src/analysis';
+import { scanProject } from '../src/scan';
 import { AutopsiaConfig } from '../src/types';
 
 let root: string;
@@ -43,14 +44,19 @@ export const List = ({ items }: { items: string[] }) => (
     expect(found[0].message).toContain('items.map()');
   });
 
-  it('ignores fixed array literals, maps inside props and nested FlatLists', () => {
+  it('ignores fixed array literals, maps inside props, tablists and nested FlatLists', () => {
     write('src/presentation/Fixed.tsx', `
-import { FlatList, ScrollView, Text } from 'react-native';
-export const Fixed = ({ rows }: { rows: string[] }) => (
-  <ScrollView refreshControl={rows.map((r) => <Text key={r}>{r}</Text>)[0]}>
-    {['a', 'b'].map((t) => <Text key={t}>{t}</Text>)}
-    <FlatList data={rows} keyExtractor={(r) => r} renderItem={renderRow} />
-  </ScrollView>
+import { FlatList, Pressable, ScrollView, Text } from 'react-native';
+export const Fixed = ({ rows, categories }: { rows: string[]; categories: { id: string; label: string }[] }) => (
+  <>
+    <ScrollView refreshControl={rows.map((r) => <Text key={r}>{r}</Text>)[0]}>
+      {['a', 'b'].map((t) => <Text key={t}>{t}</Text>)}
+      <FlatList data={rows} keyExtractor={(r) => r} renderItem={renderRow} />
+    </ScrollView>
+    <ScrollView accessibilityRole="tablist" horizontal>
+      {categories.map((c) => <Pressable key={c.id} accessibilityRole="tab"><Text>{c.label}</Text></Pressable>)}
+    </ScrollView>
+  </>
 );
 const renderRow = () => null;`);
     expect(findings().filter((v) => v.rule === 'scrollview-map')).toEqual([]);
@@ -172,5 +178,219 @@ describe('config smells', () => {
     for (let i = 0; i < 60; i++) write(`src/presentation/S${i}.tsx`, 'export const s = 1;');
     write('src/domain/one.ts', 'export const one = 1;');
     expect(codes(config)).toEqual(['smell.thinDomain']);
+  });
+});
+
+describe('readiness phases and feature/flow health', () => {
+  it('evaluates Clean Architecture verdict, 4 phases and per-flow health (auth/login vs home)', () => {
+    write('autopsia.config.json', JSON.stringify(config, null, 2));
+    write('src/domain/auth/loginUseCase.ts', 'export const loginUseCase = () => true;');
+    write('src/presentation/screens/auth/LoginScreen.tsx', `
+import { loginUseCase } from '../../../domain/auth/loginUseCase';
+export const LoginScreen = () => loginUseCase();
+`);
+    write('src/presentation/screens/home/HomeScreen.tsx', `
+import { ScrollView, Text } from 'react-native';
+export const HomeScreen = ({ items }: { items: string[] }) => (
+  <ScrollView>{items.map((x) => <Text key={x}>{x}</Text>)}</ScrollView>
+);
+`);
+
+    const outcome = scanProject(root);
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+
+    const readiness = outcome.result.readiness!;
+    expect(readiness.cleanArchVerdict).toBe('verified');
+    expect(readiness.phases).toEqual([
+      { id: 'foundation', status: 'pass', issuesCount: 0 },
+      { id: 'architecture', status: 'pass', issuesCount: 0 },
+      { id: 'flows', status: 'warn', issuesCount: 1 },
+      { id: 'production', status: 'warn', issuesCount: 1 },
+    ]);
+
+    const auth = readiness.features.find((f) => f.name === 'auth');
+    const home = readiness.features.find((f) => f.name === 'home');
+    expect(auth).toMatchObject({
+      name: 'auth',
+      files: 2,
+      architectureViolations: 0,
+      uiWarnings: 0,
+      status: 'healthy',
+    });
+    expect(home).toMatchObject({
+      name: 'home',
+      files: 1,
+      architectureViolations: 0,
+      uiWarnings: 1,
+      status: 'warning',
+    });
+  });
+
+  it('marks 1-file skeleton apps as unverified and ignores shared UI primitives in feature list', () => {
+    const skeletonCfg: AutopsiaConfig = {
+      layers: [{ name: 'composition', files: ['App.tsx'], allowedDependencies: [] }],
+      dataAccessModules: ['axios'],
+      noDirectDataAccessIn: [],
+    };
+    write('autopsia.config.json', JSON.stringify(skeletonCfg, null, 2));
+    write('App.tsx', 'export const App = () => null;');
+    const skeletonScan = scanProject(root);
+    expect(skeletonScan.ok).toBe(true);
+    if (skeletonScan.ok) {
+      expect(skeletonScan.result.readiness?.cleanArchVerdict).toBe('unverified');
+      expect(skeletonScan.result.readiness?.phases.find((p) => p.id === 'production')?.status).toBe('warn');
+    }
+
+    // Ahora añadimos archivos reales de auth + componentes UI compartidos
+    const fullCfg: AutopsiaConfig = {
+      layers: [
+        { name: 'presentation', patterns: ['src/presentation/*', 'src/shared/components/*'], allowedDependencies: ['domain'] },
+        { name: 'domain', patterns: ['src/domain/*'], allowedDependencies: [] },
+        { name: 'data', patterns: ['src/data/*'], allowedDependencies: ['domain'] },
+      ],
+      dataAccessModules: ['axios'],
+      noDirectDataAccessIn: ['presentation'],
+    };
+    write('autopsia.config.json', JSON.stringify(fullCfg, null, 2));
+    write('src/shared/components/ButtonUI/ButtonUI.tsx', 'export const ButtonUI = () => null;');
+    write('src/presentation/components/ui/SearchBarUI.tsx', 'export const SearchBarUI = () => null;');
+    write('src/presentation/contexts/AuthContext.tsx', 'export const AuthContext = () => null;');
+    write('src/data/sources/auth/authService.ts', 'export const authService = () => null;');
+    write('src/domain/auth/Session.ts', 'export interface Session { token: string }');
+
+    const fullScan = scanProject(root);
+    expect(fullScan.ok).toBe(true);
+    if (fullScan.ok) {
+      const featureNames = fullScan.result.readiness?.features.map((f) => f.name) ?? [];
+      expect(featureNames).toEqual(['auth']);
+      expect(fullScan.result.readiness?.features[0]).toMatchObject({
+        name: 'auth',
+        files: 3,
+        layers: ['presentation', 'domain', 'data'],
+      });
+    }
+  });
+
+  it('detects memory-leak, render-bottleneck and runtime-safety issues without false positives and builds remediationPlan', () => {
+    const cfg: AutopsiaConfig = {
+      layers: [
+        { name: 'presentation', patterns: ['src/presentation/*'], allowedDependencies: ['domain'] },
+        { name: 'domain', patterns: ['src/domain/*'], allowedDependencies: [] },
+        { name: 'data', patterns: ['src/data/*'], allowedDependencies: ['domain'] },
+      ],
+      dataAccessModules: ['axios'],
+      noDirectDataAccessIn: ['presentation'],
+    };
+    write('autopsia.config.json', JSON.stringify(cfg, null, 2));
+    write('src/domain/Bike.ts', 'export interface Bike { id: string; valid: boolean }');
+
+    // 1. Archivo con problemas reales de RAM, 60fps y 0-Bugs
+    write(
+      'src/presentation/screens/bikes/RentalScreen.tsx',
+      `import React, { useEffect, useState } from 'react';
+import { Animated, View } from 'react-native';
+import type { Bike } from '../../../domain/Bike';
+
+const RentalContext = { Provider: ({ value, children }: any) => children };
+
+export function RentalScreen({ bikes, eventBus }: { bikes: Bike[]; eventBus: any }) {
+  const [isQrLoading, setIsQrLoading] = useState(false);
+  const pulse = new Animated.Value(0);
+
+  // memory-leak: Animated.loop sin .stop() + listener sin cleanup return + setInterval sin clearInterval
+  useEffect(() => {
+    Animated.loop(Animated.timing(pulse, { toValue: 1, useNativeDriver: true })).start();
+    eventBus.subscribe(() => {});
+    setInterval(() => {}, 1000);
+  }, []);
+
+  // runtime-safety: async directo en useEffect
+  useEffect(async () => {}, []);
+
+  const loadQr = async () => {
+    try {
+      setIsQrLoading(true);
+      await Promise.resolve();
+    } catch {}
+  };
+
+  console.log('rendering rental screen', loadQr);
+  bikes.sort((a, b) => a.id.localeCompare(b.id));
+
+  return (
+    <RentalContext.Provider value={{ bikes, isQrLoading }}>
+      <View>{bikes.filter((b) => b.valid).map((b) => <View key={b.id} />)}</View>
+    </RentalContext.Provider>
+  );
+}
+`
+    );
+
+    // 2. Archivo en data con JSON.parse sin try/catch y AsyncStorage con token
+    write(
+      'src/data/storage/tokenStorage.ts',
+      `const AsyncStorage = { getItem: async (k: string) => '', setItem: async (k: string, v: string) => {} };
+export async function saveAndReadToken(token: string) {
+  await AsyncStorage.setItem('ACCESS_TOKEN', token);
+  const raw = await AsyncStorage.getItem('ACCESS_TOKEN');
+  return raw ? JSON.parse(raw) : null;
+}
+`
+    );
+
+    // 3. Archivo limpio que usa patrones seguros (no debe generar falsos positivos)
+    write(
+      'src/presentation/screens/auth/SafeLoginScreen.tsx',
+      `import React, { useEffect, useMemo, useState } from 'react';
+import { View } from 'react-native';
+
+export function SafeLoginScreen({ items, bus }: { items: string[]; bus: { subscribe: (cb: () => void) => () => void } }) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Retorno implícito de cleanup en arrow concisa: válido
+  useEffect(() => bus.subscribe(() => {}), [bus]);
+
+  // Sleep con new Promise(r => setTimeout): válido
+  const delay = () => new Promise((r) => setTimeout(r, 100));
+
+  const submit = async () => {
+    try {
+      setIsSubmitting(true);
+      await delay();
+    } catch {
+      // ignore controlled error
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const sorted = useMemo(() => [...items].sort(), [items]);
+  return <View onTouchStart={submit}>{sorted.length}</View>;
+}
+`
+    );
+
+    const outcome = scanProject(root);
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+
+    const rulesInRental = outcome.result.violations
+      .filter((v) => v.file.endsWith('RentalScreen.tsx'))
+      .map((v) => v.rule);
+    expect(rulesInRental).toContain('memory-leak');
+    expect(rulesInRental).toContain('render-bottleneck');
+    expect(rulesInRental).toContain('runtime-safety');
+
+    const rulesInStorage = outcome.result.violations
+      .filter((v) => v.file.endsWith('tokenStorage.ts'))
+      .map((v) => v.rule);
+    expect(rulesInStorage).toContain('runtime-safety');
+
+    const safeViolations = outcome.result.violations.filter((v) => v.file.endsWith('SafeLoginScreen.tsx'));
+    expect(safeViolations).toEqual([]);
+
+    const planIds = outcome.result.readiness?.remediationPlan?.map((s) => s.id) ?? [];
+    expect(planIds).toEqual(['runtime-safety', 'memory-leak', 'render-bottleneck']);
   });
 });

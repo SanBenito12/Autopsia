@@ -7,7 +7,14 @@ import { buildConfig, detectLayers, initProject } from '../src/init';
 import { AutopsiaConfig } from '../src/types';
 import { loadGraph, SAMPLE_APP } from './helpers';
 
-const QUALITY_RULES: string[] = ['scrollview-map', 'flatlist-performance', 'component-size'];
+const QUALITY_RULES: string[] = [
+  'scrollview-map',
+  'flatlist-performance',
+  'component-size',
+  'memory-leak',
+  'render-bottleneck',
+  'runtime-safety',
+];
 
 describe('severidad configurable por regla', () => {
   const { graph, config: baseConfig } = loadGraph(SAMPLE_APP);
@@ -86,6 +93,9 @@ describe('autopsia init genera la sección rules', () => {
       'scrollview-map': 'warning',
       'flatlist-performance': 'warning',
       'component-size': 'warning',
+      'memory-leak': 'warning',
+      'render-bottleneck': 'warning',
+      'runtime-safety': 'warning',
     });
   });
 

@@ -105,7 +105,88 @@ export interface FileNode {
   codeFacts?: CodeFact[];
 }
 
-export type CodeFactKind = 'scrollview-map' | 'flatlist-key' | 'flatlist-render' | 'component-size' | 'hook-size';
+export type CodeFactKind =
+  | 'scrollview-map'
+  | 'flatlist-key'
+  | 'flatlist-render'
+  | 'component-size'
+  | 'hook-size'
+  | 'direct-fetch'
+  | 'timer-leak'
+  | 'listener-leak'
+  | 'animation-leak'
+  | 'inline-context-value'
+  | 'high-freq-context'
+  | 'heavy-render-compute'
+  | 'animated-js-driver'
+  | 'console-in-prod'
+  | 'async-use-effect'
+  | 'unsafe-json-parse'
+  | 'silent-catch'
+  | 'stuck-loading'
+  | 'state-mutation'
+  | 'insecure-token-storage';
+
+export type CleanArchVerdict = 'verified' | 'partial' | 'unverified' | 'failing';
+
+export type PhaseStatus = 'pass' | 'warn' | 'fail';
+
+export type ReadinessPhaseId = 'foundation' | 'architecture' | 'flows' | 'production';
+
+export interface ReadinessPhase {
+  id: ReadinessPhaseId;
+  status: PhaseStatus;
+  /** Número de pendientes o avisos en esta fase */
+  issuesCount: number;
+}
+
+export interface FeatureHealth {
+  /** Nombre del flujo o feature (p. ej. "auth", "login", "home") */
+  name: string;
+  /** Total de archivos detectados en este flujo */
+  files: number;
+  /** Capas presentes en este flujo */
+  layers: string[];
+  /** Violaciones de arquitectura dentro del flujo */
+  architectureViolations: number;
+  /** Avisos de calidad/rendimiento UI (FlatList vs ScrollView, tamaño, RAM, etc.) */
+  uiWarnings: number;
+  /** Salud porcentual (0–100) de archivos limpios en el flujo */
+  healthPercent: number;
+  status: 'healthy' | 'warning' | 'critical';
+}
+
+export type RemediationPriority = 'critical' | 'high' | 'medium';
+
+export type RemediationStepId =
+  | 'runtime-safety'
+  | 'memory-leak'
+  | 'architecture'
+  | 'render-bottleneck'
+  | 'ui-lists-size';
+
+export interface RemediationStep {
+  id: RemediationStepId;
+  priority: RemediationPriority;
+  /** Número de hallazgos en este paso */
+  count: number;
+  /** Archivos afectados */
+  filesCount: number;
+  /** Flujos afectados (p. ej. ["auth", "bikes"]) */
+  affectedFlows: string[];
+  /** Reglas asociadas para filtrar directamente en la UI */
+  rules: string[];
+}
+
+export interface ProjectReadiness {
+  cleanArchVerdict: CleanArchVerdict;
+  phases: ReadinessPhase[];
+  features: FeatureHealth[];
+  /** Mapa ruta de archivo -> nombre del flujo/feature al que pertenece */
+  flowByFile?: Record<string, string>;
+  /** Plan de acción priorizado cuando la app tiene problemas o riesgos para producción */
+  remediationPlan?: RemediationStep[];
+}
 
 /** Patrón de código encontrado en el AST que alimenta las reglas de calidad. */
 export interface CodeFact {
@@ -181,6 +262,8 @@ export interface ScanResult {
   analysis?: AnalysisCoverage;
   /** Configuración que puede dar un resultado limpio aunque la arquitectura no lo esté. */
   configWarnings?: AnalysisIssue[];
+  /** Evaluación de Clean Architecture, madurez por fases y salud por flujo/feature. */
+  readiness?: ProjectReadiness;
 }
 
 export interface ReportComparison {

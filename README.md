@@ -2,15 +2,16 @@
 
 [![CI](https://github.com/SanBenito12/Autopsia/actions/workflows/ci.yml/badge.svg)](https://github.com/SanBenito12/Autopsia/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/autopsia-rn)](https://www.npmjs.com/package/autopsia-rn)
+[![macOS DMG](https://img.shields.io/badge/macOS-Download%20.dmg-000000?logo=apple)](https://github.com/SanBenito12/Autopsia/releases/latest)
 [![MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 English · [Español](README.es.md)
 
-**Stop new architecture violations in your React Native app—without fixing all your legacy debt first.**
+**Stop new architecture violations, RAM leaks, 60fps bottlenecks and runtime crashes in your React Native app—without fixing all your legacy debt first.**
 
-Autopsia checks your TypeScript dependencies against configured layer rules. Record today's debt as a baseline, block new errors in CI, and explore an offline dependency graph.
+Autopsia checks your TypeScript dependencies and AST against Clean Architecture and production readiness rules. Record today's debt as a baseline, block new errors in CI, and explore your project in the **macOS Desktop App** or offline HTML dependency graph.
 
-[Try the interactive demo](https://sanbenito12.github.io/Autopsia/report.html) · [Get started](https://github.com/SanBenito12/Autopsia/blob/main/docs/getting-started.md) · [Website](https://sanbenito12.github.io/Autopsia/)
+[ Download macOS App (.dmg — Apple Silicon)](https://github.com/SanBenito12/Autopsia/releases/latest/download/Autopsia-0.1.0-arm64.dmg) · [ Download macOS App (.dmg — Intel)](https://github.com/SanBenito12/Autopsia/releases/latest/download/Autopsia-0.1.0.dmg) · [Try the interactive demo](https://sanbenito12.github.io/Autopsia/report.html) · [Get started](https://github.com/SanBenito12/Autopsia/blob/main/docs/getting-started.md) · [Website](https://sanbenito12.github.io/Autopsia/)
 
 ![Actual CLI output from the public sample fixture](https://raw.githubusercontent.com/SanBenito12/Autopsia/main/docs/demo.png)
 
@@ -59,9 +60,15 @@ See new, resolved and persistent violations, including tolerated debt. Compariso
 |---|---|
 | `feature-boundaries` | Forbids importing private internals across features; enforces Public API (`index.ts`) |
 | `dependency-direction` | Domain importing a data implementation against its allowed dependencies |
-| `direct-data-access` | UI importing configured data clients such as axios or AsyncStorage |
+| `direct-data-access` | UI importing configured data clients (`axios`, `AsyncStorage`) or calling global `fetch()` directly |
 | `forbidden-external` | Domain importing React or another forbidden external package |
 | `circular-deps` | An import chain returning to its starting file |
+| `memory-leak` | `setInterval`/`setTimeout`, event listeners, or `Animated.loop()` in `useEffect` without unmount cleanup |
+| `render-bottleneck` | Unmemoized `<Context.Provider value={{...}}>` (especially with timers), JSX `.filter().map()` chains without `useMemo`, missing `useNativeDriver`, `console.log` in production |
+| `runtime-safety` | Unprotected `JSON.parse()`, empty `catch {}`, stuck loading states (`setLoading(true)` without `finally`), in-place `.sort()` mutations, plaintext tokens in `AsyncStorage` |
+| `scrollview-map` | `<ScrollView>` rendering dynamic `.map()` lists instead of `FlatList` |
+| `flatlist-performance` | `<FlatList>` missing `keyExtractor` or passing inline `renderItem` |
+| `component-size` | React components or custom hooks exceeding configured line limits |
 
 Configure `error`, `warning` or `off` per rule. Document local exceptions with `// autopsia-ignore-next-line <rule> -- reason`. [Examples and fixes](https://github.com/SanBenito12/Autopsia/blob/main/docs/rules.md).
 

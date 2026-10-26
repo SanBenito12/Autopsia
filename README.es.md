@@ -2,15 +2,16 @@
 
 [![CI](https://github.com/SanBenito12/Autopsia/actions/workflows/ci.yml/badge.svg)](https://github.com/SanBenito12/Autopsia/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/autopsia-rn)](https://www.npmjs.com/package/autopsia-rn)
+[![macOS DMG](https://img.shields.io/badge/macOS-Descargar%20.dmg-000000?logo=apple)](https://github.com/SanBenito12/Autopsia/releases/latest)
 [![MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 [English](README.md) · Español
 
-**Evita nuevas violaciones arquitectónicas en tu app React Native sin arreglar toda la deuda heredada primero.**
+**Evita violaciones de Clean Architecture, fugas de RAM, cuellos de botella de 60fps y crashes en tu app React Native sin arreglar toda la deuda heredada primero.**
 
-Autopsia comprueba dependencias TypeScript contra reglas de capas configuradas. Registra la deuda actual como baseline, bloquea errores nuevos en CI y explora un grafo sin conexión.
+Autopsia comprueba dependencias TypeScript y el AST contra reglas de arquitectura, madurez por fases y calidad de producción. Registra la deuda actual como baseline, bloquea errores nuevos en CI y explora tu proyecto en la **App de Escritorio para macOS** o en el grafo HTML sin conexión.
 
-[Demo interactiva](https://sanbenito12.github.io/Autopsia/report.es.html) · [Guía inicial](https://github.com/SanBenito12/Autopsia/blob/main/docs/getting-started.es.md)
+[ Descargar App macOS (.dmg — Apple Silicon)](https://github.com/SanBenito12/Autopsia/releases/latest/download/Autopsia-0.1.0-arm64.dmg) · [ Descargar App macOS (.dmg — Intel)](https://github.com/SanBenito12/Autopsia/releases/latest/download/Autopsia-0.1.0.dmg) · [Demo interactiva](https://sanbenito12.github.io/Autopsia/report.es.html) · [Guía inicial](https://github.com/SanBenito12/Autopsia/blob/main/docs/getting-started.es.md)
 
 ## Inicio Rápido (Comandos Cero Fricción)
 
@@ -49,9 +50,15 @@ Para medir una refactorización, guarda un JSON con `-o before.json` y después 
 |---|---|
 | `feature-boundaries` | Aislamiento de features; prohíbe importar submódulos privados entre features (obliga API pública `index.ts`) |
 | `dependency-direction` | Dependencias entre capas no permitidas |
-| `direct-data-access` | Imports de clientes de datos configurados desde capas restringidas |
+| `direct-data-access` | Imports de clientes de datos configurados o llamadas directas a `fetch()` desde capas restringidas |
 | `forbidden-external` | Paquetes externos prohibidos en una capa |
 | `circular-deps` | Ciclos de imports |
+| `memory-leak` | Timers (`setInterval`/`setTimeout`), suscripciones o `Animated.loop()` en `useEffect` sin limpieza al desmontar |
+| `render-bottleneck` | `<Context.Provider value={{...}}>` sin `useMemo` (especialmente con timers), `.filter().map()` en JSX sin `useMemo`, animaciones sin `useNativeDriver`, `console.log` en producción |
+| `runtime-safety` | `JSON.parse()` sin `try/catch`, `catch {}` vacíos, estados de carga colgados (`setLoading(true)` sin `finally`), mutación `.sort()` in-place y tokens en `AsyncStorage` plano |
+| `scrollview-map` | `<ScrollView>` que pinta listas dinámicas con `.map()` en vez de `FlatList` |
+| `flatlist-performance` | `<FlatList>` sin `keyExtractor` o con `renderItem` creado en línea |
+| `component-size` | Componentes o hooks que superan el límite de líneas configurado |
 
 Cada regla acepta `error`, `warning` u `off`; las excepciones locales usan comentarios `autopsia-ignore`.
 

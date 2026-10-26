@@ -1,4 +1,4 @@
-import { t, present } from "./i18n";
+import { t, present, type MessageKey } from "./i18n";
 import chalk from 'chalk';
 import * as fs from 'fs';
 import { AnalysisIssue, AnalysisIssueKind, ScanResult, Violation } from './types';
@@ -122,6 +122,51 @@ export function printReport(result: ScanResult): void {
     console.log('');
   }
 
+  if (result.readiness) {
+    const { cleanArchVerdict, phases, features } = result.readiness;
+    console.log(chalk.bold(t("report.readinessTitle", {})));
+    const verdictColor =
+      cleanArchVerdict === 'verified'
+        ? chalk.green.bold
+        : cleanArchVerdict === 'failing'
+          ? chalk.red.bold
+          : chalk.yellow.bold;
+    console.log(`  ${verdictColor(t(`report.verdict.${cleanArchVerdict}` as const, {}))}`);
+    for (const phase of phases) {
+      const icon = phase.status === 'pass' ? chalk.green('✔') : phase.status === 'warn' ? chalk.yellow('⚠') : chalk.red('✖');
+      const label = t(`report.phase.${phase.id}` as const, {}).padEnd(30);
+      const count = phase.issuesCount > 0 ? chalk.gray(`(${phase.issuesCount})`) : '';
+      console.log(`    ${icon} ${label} ${count}`);
+    }
+    console.log('');
+
+    if (features.length > 0) {
+      console.log(chalk.bold(t("report.featuresTitle", {})));
+      for (const feat of features.slice(0, 8)) {
+        const bar = '█'.repeat(Math.round(feat.healthPercent / 10)).padEnd(10, '░');
+        const notes: string[] = [];
+        if (feat.architectureViolations > 0) notes.push(t("report.featureArchIssues", { p0: feat.architectureViolations }));
+        if (feat.uiWarnings > 0) notes.push(t("report.featureUiIssues", { p0: feat.uiWarnings }));
+        const suffix = notes.length > 0 ? ` · ${notes.join(', ')}` : '';
+        console.log(
+          `  ${feat.name.padEnd(16)} ${healthColor(feat.healthPercent)(bar)} ${healthColor(feat.healthPercent)(feat.healthPercent + '%')} ${chalk.gray(`(${feat.files} · ${feat.layers.join(', ') || '—'}${suffix})`)}`
+        );
+      }
+      console.log('');
+    }
+
+    const plan = result.readiness.remediationPlan ?? [];
+    if (plan.length > 0) {
+      console.log(chalk.bold(t("report.remediationTitle", {})));
+      for (const step of plan) {
+        const color = step.priority === 'critical' ? chalk.red.bold : step.priority === 'high' ? chalk.yellow.bold : chalk.cyan;
+        const flowsNote = step.affectedFlows.length > 0 ? chalk.gray(` [${step.affectedFlows.join(', ')}]`) : '';
+        console.log(`  ${color(t(`report.remediation.${step.id}` as MessageKey, { p0: step.count, p1: step.filesCount }))}${flowsNote}`);
+      }
+      console.log('');
+    }
+  }
+
   const tolerated = result.tolerated ?? [];
   const suppressedNote = (): void => {
     if (result.suppressedCount) {
@@ -232,7 +277,34 @@ export function writeGitHubSummary(result: ScanResult): void {
     if (result.tolerated && result.tolerated.length > 0) {
       md += `| **Tolerated Baseline Debt** | ⊘ ${result.tolerated.length} |\n`;
     }
+    if (result.readiness) {
+      const verdictIcon =
+        result.readiness.cleanArchVerdict === 'verified'
+          ? '✅ Verified'
+          : result.readiness.cleanArchVerdict === 'failing'
+            ? '❌ Failing'
+            : '⚠️ ' + result.readiness.cleanArchVerdict;
+      md += `| **Clean Architecture** | ${verdictIcon} |\n`;
+    }
     md += `\n### Layer Health\n| Layer | Health Score |\n| :--- | :--- |\n${healthRows}\n\n`;
+
+    if (result.readiness) {
+      const phaseRows = result.readiness.phases
+        .map((p) => {
+          const icon = p.status === 'pass' ? '✅' : p.status === 'warn' ? '⚠️' : '❌';
+          return `| **${p.id}** | ${icon} ${p.status} (${p.issuesCount}) |`;
+        })
+        .join('\n');
+      md += `### Readiness Phases\n| Phase | Status |\n| :--- | :--- |\n${phaseRows}\n\n`;
+
+      if (result.readiness.features.length > 0) {
+        const featRows = result.readiness.features
+          .slice(0, 12)
+          .map((f) => `| \`${f.name}\` | ${f.files} | ${f.layers.join(', ') || '—'} | ${f.healthPercent}% | ${f.architectureViolations} arch / ${f.uiWarnings} UI |`)
+          .join('\n');
+        md += `### Flow / Feature Health\n| Flow | Files | Layers | Health | Issues |\n| :--- | :---: | :--- | :---: | :--- |\n${featRows}\n\n`;
+      }
+    }
 
     if (result.violations.length > 0) {
       md += `### Violations Found\n| Rule | File | Message |\n| :--- | :--- | :--- |\n`;

@@ -43,6 +43,27 @@ export function checkDirectDataAccess(
         violations.push(violation);
       }
     }
+
+    for (const fact of node.codeFacts ?? []) {
+      if (fact.kind !== 'direct-fetch') continue;
+      const spec = String(fact.params.p0 ?? 'fetch()');
+      const violation: Violation = {
+        diagnostic: {
+          message: { code: 'rule.data', params: { p0: spec, p1: node.layer } },
+          detail: { code: 'rule.repository', params: {} },
+        },
+        rule: 'direct-data-access',
+        severity: 'error',
+        file: node.path,
+        line: fact.line,
+        message: format('rule.data', { p0: spec, p1: node.layer }, 'es'),
+        detail: format('rule.repository', {}, 'es'),
+      };
+      if (fact.suppressedRules?.some((r) => r === '*' || r === 'direct-data-access')) {
+        violation.suppressed = true;
+      }
+      violations.push(violation);
+    }
   }
 
   return violations;

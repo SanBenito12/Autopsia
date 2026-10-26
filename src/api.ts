@@ -14,6 +14,7 @@ export { generateHtml, violationEdges } from './viewer';
 export { analysisCoveragePercent } from './reporter';
 export { startWatcher } from './watcher';
 export { ALL_RULES } from './rules/run';
+export { computeReadiness, computeFeatureHealth, inferFeatureOrFlow, ARCH_RULES, UI_QUALITY_RULES } from './readiness';
 export { present, setLocale, getLocale, format } from './i18n';
 export type { Locale } from './i18n';
 export * from './types';

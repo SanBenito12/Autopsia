@@ -23,6 +23,9 @@ export const ALL_RULES = [
   'scrollview-map',
   'flatlist-performance',
   'component-size',
+  'memory-leak',
+  'render-bottleneck',
+  'runtime-safety',
 ] as const;
 
 export type RuleName = (typeof ALL_RULES)[number];
@@ -32,6 +35,9 @@ const DEFAULT_LEVELS: Partial<Record<RuleName, RuleLevel>> = {
   'scrollview-map': 'warning',
   'flatlist-performance': 'warning',
   'component-size': 'warning',
+  'memory-leak': 'warning',
+  'render-bottleneck': 'warning',
+  'runtime-safety': 'warning',
 };
 
 export const defaultLevel = (rule: RuleName): RuleLevel => DEFAULT_LEVELS[rule] ?? 'error';
@@ -50,6 +56,9 @@ export function runRules(graph: FileNode[], config: AutopsiaConfig): Violation[]
     'scrollview-map': () => checkCodeFacts(graph, 'scrollview-map'),
     'flatlist-performance': () => checkCodeFacts(graph, 'flatlist-performance'),
     'component-size': () => checkCodeFacts(graph, 'component-size'),
+    'memory-leak': () => checkCodeFacts(graph, 'memory-leak'),
+    'render-bottleneck': () => checkCodeFacts(graph, 'render-bottleneck'),
+    'runtime-safety': () => checkCodeFacts(graph, 'runtime-safety'),
   };
 
   const violations: Violation[] = [];

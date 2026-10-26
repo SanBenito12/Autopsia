@@ -332,11 +332,23 @@ export function buildReactNativeConfig(root: string): AutopsiaConfig {
     for (const appFolder of ['application', 'usecases', 'use-cases']) {
       if (scopeChildren.includes(appFolder)) add('application', `${scope}${appFolder}`);
     }
-    for (const uiFolder of ['components', 'hooks', 'navigation', 'theme']) {
+    for (const uiFolder of ['components', 'hooks', 'navigation', 'theme', 'context', 'contexts', 'assets']) {
       if (scopeChildren.includes(uiFolder)) add('presentation', `${scope}${uiFolder}`);
+    }
+    for (const domainFolder of ['constants', 'types']) {
+      if (scopeChildren.includes(domainFolder) && detected.some((l) => l.name === 'domain')) {
+        add('domain', `${scope}${domainFolder}`);
+      }
     }
     for (const infraFolder of ['api', 'clients', 'storage']) {
       if (scopeChildren.includes(infraFolder)) add('infrastructure', `${scope}${infraFolder}`);
+    }
+    if (scopeChildren.includes('config')) {
+      if (detected.some((l) => l.name === 'infrastructure')) add('infrastructure', `${scope}config`);
+      else if (detected.some((l) => l.name === 'data')) add('data', `${scope}config`);
+    }
+    if (scope === '' && scopeChildren.includes('utils') && detected.some((l) => l.name === 'presentation')) {
+      add('presentation', 'utils');
     }
     for (const name of children(path.join(root, 'src', scope, 'shared'))) {
       const targetLayer = sharedLayerByFolder[name.toLowerCase()];

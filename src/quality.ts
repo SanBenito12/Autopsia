@@ -66,10 +66,20 @@ function destructuredValue(binding: import('ts-morph').BindingElement): Node | u
  * <ScrollView> que pinta un arreglo con .map(): monta todos los elementos a la
  * vez. Se ignoran las listas fijas (arreglos literales y constantes).
  */
+function isTabListScroll(element: JsxElement): boolean {
+  const attrs = element.getOpeningElement().getAttributes().filter(Node.isJsxAttribute);
+  const roleAttr = attrs.find((a) => a.getNameNode().getText() === 'accessibilityRole');
+  if (roleAttr && /["']tablist["']/.test(roleAttr.getInitializer()?.getText() ?? '')) {
+    return true;
+  }
+  return false;
+}
+
 function scrollViewMaps(sf: SourceFile): Fact[] {
   const facts: Fact[] = [];
   for (const element of sf.getDescendantsOfKind(SyntaxKind.JsxElement)) {
     if (!SCROLL_TAGS.has(tagOf(element.getOpeningElement()))) continue;
+    if (isTabListScroll(element)) continue;
     const call = element.getDescendantsOfKind(SyntaxKind.CallExpression).find((c) => {
       const callee = c.getExpression();
       if (!Node.isPropertyAccessExpression(callee) || callee.getName() !== 'map') return false;
@@ -143,8 +153,369 @@ function largeFunctions(sf: SourceFile, limits: Required<QualityLimits>): Fact[]
   return facts;
 }
 
+const GLOBAL_HOSTS = new Set(['globalThis', 'window', 'self']);
+
+/** Llamadas directas a fetch() global (o window/globalThis.fetch) sin pasar por un cliente/repositorio. */
+function directFetchCalls(sf: SourceFile): Fact[] {
+  const facts: Fact[] = [];
+  for (const call of sf.getDescendantsOfKind(SyntaxKind.CallExpression)) {
+    const callee = call.getExpression();
+    if (Node.isIdentifier(callee) && callee.getText() === 'fetch') {
+      let localDef = false;
+      try {
+        localDef = callee.getDefinitionNodes().some((d) => d.getSourceFile() === sf);
+      } catch {
+        localDef = false;
+      }
+      if (!localDef) {
+        facts.push({ kind: 'direct-fetch', line: call.getStartLineNumber(), params: { p0: 'fetch()' } });
+      }
+    } else if (
+      Node.isPropertyAccessExpression(callee) &&
+      callee.getName() === 'fetch' &&
+      GLOBAL_HOSTS.has(callee.getExpression().getText())
+    ) {
+      facts.push({ kind: 'direct-fetch', line: call.getStartLineNumber(), params: { p0: 'fetch()' } });
+    }
+  }
+  return facts;
+}
+
+/**
+ * Fugas de memoria y saturación de RAM:
+ * 1. setInterval / setTimeout en componentes o hooks sin clearInterval / clearTimeout.
+ * 2. Listeners / suscripciones en useEffect con cuerpo de bloque { ... } sin return de limpieza.
+ * 3. Animated.loop(...).start() en useEffect sin .stop() o .reset() al desmontar.
+ */
+function memoryLeaks(sf: SourceFile): Fact[] {
+  const facts: Fact[] = [];
+  const filePath = sf.getFilePath().replace(/\\/g, '/');
+  const isUiOrHookFile = filePath.endsWith('.tsx') || /\/use[A-Z]\w*\.(ts|tsx)$/.test(filePath);
+  const fullText = sf.getFullText();
+  const hasClearInterval = /\bclearInterval\b/.test(fullText);
+  const hasClearTimeout = /\bclearTimeout\b/.test(fullText);
+
+  for (const call of sf.getDescendantsOfKind(SyntaxKind.CallExpression)) {
+    const exprText = call.getExpression().getText();
+
+    // 1. Timers sin limpieza
+    if (/^(window\.|globalThis\.)?setInterval$/.test(exprText) && !hasClearInterval) {
+      facts.push({ kind: 'timer-leak', line: call.getStartLineNumber(), params: { p0: 'setInterval' } });
+    } else if (
+      isUiOrHookFile &&
+      /^(window\.|globalThis\.)?setTimeout$/.test(exprText) &&
+      !hasClearTimeout
+    ) {
+      const inPromiseSleep = call.getFirstAncestor(
+        (a) => Node.isNewExpression(a) && a.getExpression().getText() === 'Promise'
+      );
+      if (!inPromiseSleep) {
+        facts.push({ kind: 'timer-leak', line: call.getStartLineNumber(), params: { p0: 'setTimeout' } });
+      }
+    }
+
+    // 2. Animated.loop en useEffect sin .stop() / .reset()
+    if (exprText === 'Animated.loop') {
+      const useEffectCall = call.getFirstAncestor(
+        (a) => Node.isCallExpression(a) && /^(React\.)?useEffect$/.test(a.getExpression().getText())
+      );
+      if (useEffectCall && !/\.(stop|reset)\s*\(/.test(useEffectCall.getText())) {
+        facts.push({ kind: 'animation-leak', line: call.getStartLineNumber(), params: { p0: 'Animated.loop' } });
+      }
+    }
+
+    // 3. Suscripciones / listeners en useEffect sin return de cleanup
+    if (exprText === 'useEffect' || exprText === 'React.useEffect') {
+      const arg0 = call.getArguments()[0];
+      if (!arg0 || (!Node.isArrowFunction(arg0) && !Node.isFunctionExpression(arg0))) continue;
+      const body = arg0.getBody();
+      // Si es arrow concisa: useEffect(() => service.subscribe(...), []) ya devuelve el unsubscribe implícitamente
+      if (!Node.isBlock(body)) continue;
+
+      const hasCleanupReturn = body
+        .getDescendantsOfKind(SyntaxKind.ReturnStatement)
+        .some(
+          (ret) =>
+            ret.getExpression() !== undefined &&
+            ret.getFirstAncestor((a) => Node.isFunctionLikeDeclaration(a)) === arg0
+        );
+
+      if (!hasCleanupReturn) {
+        for (const inner of body.getDescendantsOfKind(SyntaxKind.CallExpression)) {
+          const innerCallee = inner.getExpression();
+          if (!Node.isPropertyAccessExpression(innerCallee)) continue;
+          const method = innerCallee.getName();
+          if (
+            ['addEventListener', 'addListener', 'subscribe', 'watchPositionAsync', 'onAuthStateChange'].includes(
+              method
+            )
+          ) {
+            facts.push({
+              kind: 'listener-leak',
+              line: inner.getStartLineNumber(),
+              params: { p0: shorten(innerCallee.getText()) },
+            });
+          }
+        }
+      }
+    }
+  }
+
+  return facts;
+}
+
+/**
+ * Cuellos de botella de rendimiento y fluidez (60fps):
+ * 1. <Context.Provider value={{ ... }}> sin useMemo (y agravado si tiene setInterval de alta frecuencia).
+ * 2. Cadenas .filter().map() o .sort() directamente en expresiones JSX fuera de useMemo.
+ * 3. Animated.timing / Animated.spring sin useNativeDriver.
+ * 4. console.log / console.debug dejados en código de producción.
+ */
+function renderBottlenecks(sf: SourceFile): Fact[] {
+  const facts: Fact[] = [];
+  const filePath = sf.getFilePath().replace(/\\/g, '/');
+  const isTsx = filePath.endsWith('.tsx');
+  const hasIntervalInFile = /\bsetInterval\s*\(/.test(sf.getFullText());
+  const isLoggerOrSetup = /(^|\/)(setup|jest|scripts?|mocks?|__mocks__|.*logger)\.(ts|tsx|js|jsx)$/i.test(filePath);
+
+  if (isTsx) {
+    const openings: Opening[] = [
+      ...sf.getDescendantsOfKind(SyntaxKind.JsxOpeningElement),
+      ...sf.getDescendantsOfKind(SyntaxKind.JsxSelfClosingElement),
+    ];
+    for (const el of openings) {
+      const tag = tagOf(el);
+      if (!tag.endsWith('.Provider')) continue;
+      for (const attr of el.getAttributes()) {
+        if (!Node.isJsxAttribute(attr) || attr.getNameNode().getText() !== 'value') continue;
+        const init = attr.getInitializer();
+        const expr = init && Node.isJsxExpression(init) ? init.getExpression() : undefined;
+        if (expr && (Node.isObjectLiteralExpression(expr) || Node.isArrayLiteralExpression(expr))) {
+          facts.push({
+            kind: hasIntervalInFile ? 'high-freq-context' : 'inline-context-value',
+            line: attr.getStartLineNumber(),
+            params: { p0: tag },
+          });
+        }
+      }
+    }
+  }
+
+  for (const call of sf.getDescendantsOfKind(SyntaxKind.CallExpression)) {
+    const callee = call.getExpression();
+    const exprText = callee.getText();
+
+    // Animated.timing / spring sin useNativeDriver
+    if (exprText === 'Animated.timing' || exprText === 'Animated.spring') {
+      const configArg = call.getArguments()[1];
+      if (configArg && Node.isObjectLiteralExpression(configArg) && !configArg.getProperty('useNativeDriver')) {
+        facts.push({
+          kind: 'animated-js-driver',
+          line: call.getStartLineNumber(),
+          params: { p0: exprText },
+        });
+      }
+    }
+
+    // console.log / console.debug en producción
+    if (!isLoggerOrSetup && (exprText === 'console.log' || exprText === 'console.debug')) {
+      facts.push({
+        kind: 'console-in-prod',
+        line: call.getStartLineNumber(),
+        params: { p0: exprText },
+      });
+    }
+
+    // Cadenas pesadas .filter(...).map(...) en JSX sin useMemo
+    if (isTsx && Node.isPropertyAccessExpression(callee) && callee.getName() === 'map') {
+      const receiver = callee.getExpression();
+      if (Node.isCallExpression(receiver)) {
+        const receiverCallee = receiver.getExpression();
+        if (
+          Node.isPropertyAccessExpression(receiverCallee) &&
+          ['filter', 'sort', 'flatMap', 'reduce'].includes(receiverCallee.getName())
+        ) {
+          const baseArray = receiverCallee.getExpression();
+          if (!isFixedList(baseArray)) {
+            const inMemoOrEffect = call
+              .getAncestors()
+              .some(
+                (a) =>
+                  Node.isCallExpression(a) &&
+                  /^(React\.)?(useMemo|useCallback|useEffect)$/.test(a.getExpression().getText())
+              );
+            const inJsx = call.getFirstAncestorByKind(SyntaxKind.JsxExpression);
+            if (!inMemoOrEffect && inJsx) {
+              facts.push({
+                kind: 'heavy-render-compute',
+                line: call.getStartLineNumber(),
+                params: { p0: shorten(`${baseArray.getText()}.${receiverCallee.getName()}().map()`) },
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return facts;
+}
+
+/**
+ * Comprueba si un identificador fue declarado localmente como copia fresca
+ * (ej. `const copy = [...items]`, `items.slice()`, `items.filter()`, `Array.from()`).
+ */
+function isLocalFreshArray(node: Node): boolean {
+  if (!Node.isIdentifier(node)) return false;
+  let defs: Node[] = [];
+  try {
+    defs = node.getDefinitionNodes();
+  } catch {
+    return false;
+  }
+  return defs.some((def) => {
+    if (!Node.isVariableDeclaration(def)) return false;
+    const init = def.getInitializer();
+    if (!init) return false;
+    if (Node.isArrayLiteralExpression(init)) return true;
+    if (Node.isCallExpression(init)) {
+      const text = init.getExpression().getText();
+      if (/\.(slice|filter|map|concat|flatMap)$/.test(text) || /^Array\.from$/.test(text) || /^Object\.(keys|values|entries)$/.test(text)) {
+        return true;
+      }
+    }
+    return false;
+  });
+}
+
+/**
+ * Seguridad en tiempo de ejecución, prevención de crashes y 0-bugs:
+ * 1. useEffect(async () => ...)
+ * 2. JSON.parse() sin try/catch
+ * 3. Bloques catch {} vacíos que tragan errores silenciosamente
+ * 4. Estados de carga colgados (setLoading(true) sin setLoading(false) en catch/finally)
+ * 5. Mutación in-place de estado/props con .sort() o .reverse()
+ * 6. Tokens o credenciales guardados en AsyncStorage sin cifrar
+ */
+function runtimeSafety(sf: SourceFile): Fact[] {
+  const facts: Fact[] = [];
+
+  for (const call of sf.getDescendantsOfKind(SyntaxKind.CallExpression)) {
+    const callee = call.getExpression();
+    const exprText = callee.getText();
+
+    // 1. useEffect(async () => ...)
+    if (exprText === 'useEffect' || exprText === 'React.useEffect') {
+      const arg0 = call.getArguments()[0];
+      if (arg0 && (Node.isArrowFunction(arg0) || Node.isFunctionExpression(arg0)) && arg0.isAsync()) {
+        facts.push({
+          kind: 'async-use-effect',
+          line: call.getStartLineNumber(),
+          params: { p0: 'useEffect(async () => …)' },
+        });
+      }
+    }
+
+    // 2. JSON.parse sin try/catch
+    if (exprText === 'JSON.parse') {
+      const inTry = call.getFirstAncestorByKind(SyntaxKind.TryStatement);
+      if (!inTry) {
+        facts.push({
+          kind: 'unsafe-json-parse',
+          line: call.getStartLineNumber(),
+          params: { p0: 'JSON.parse()' },
+        });
+      }
+    }
+
+    // 5. Mutación in-place con .sort() / .reverse() sobre estado o props
+    if (Node.isPropertyAccessExpression(callee)) {
+      const method = callee.getName();
+      if (method === 'sort' || method === 'reverse') {
+        const target = callee.getExpression();
+        if (
+          (Node.isIdentifier(target) || Node.isPropertyAccessExpression(target)) &&
+          !isLocalFreshArray(target) &&
+          !isFixedList(target)
+        ) {
+          facts.push({
+            kind: 'state-mutation',
+            line: call.getStartLineNumber(),
+            params: { p0: shorten(`${target.getText()}.${method}()`) },
+          });
+        }
+      }
+    }
+
+    // 6. Tokens sensibles en AsyncStorage plano
+    if (exprText === 'AsyncStorage.setItem') {
+      const keyArg = call.getArguments()[0];
+      const keyText = keyArg?.getText() ?? '';
+      if (/token|refresh|password|secret|jwt|credential/i.test(keyText)) {
+        facts.push({
+          kind: 'insecure-token-storage',
+          line: call.getStartLineNumber(),
+          params: { p0: shorten(keyText) },
+        });
+      }
+    }
+  }
+
+  // 3. Bloques catch {} completamente vacíos
+  for (const catchClause of sf.getDescendantsOfKind(SyntaxKind.CatchClause)) {
+    const block = catchClause.getBlock();
+    if (block.getStatements().length === 0) {
+      const innerText = block.getText().slice(1, -1).trim();
+      if (innerText.length === 0) {
+        facts.push({
+          kind: 'silent-catch',
+          line: catchClause.getStartLineNumber(),
+          params: { p0: 'catch {}' },
+        });
+      }
+    }
+  }
+
+  // 4. Estados de carga colgados (setLoading(true) seguido de await sin setLoading(false) en catch/finally)
+  const LOADING_SETTER = /^set[A-Z]\w*(Loading|Submitting|Fetching|Processing|Refreshing)$/;
+  for (const tryStmt of sf.getDescendantsOfKind(SyntaxKind.TryStatement)) {
+    const tryBlock = tryStmt.getTryBlock();
+    const awaits = tryBlock.getDescendantsOfKind(SyntaxKind.AwaitExpression);
+    if (awaits.length === 0) continue;
+    const lastAwaitPos = awaits[awaits.length - 1].getEnd();
+
+    for (const call of tryBlock.getDescendantsOfKind(SyntaxKind.CallExpression)) {
+      const setterName = call.getExpression().getText();
+      if (!LOADING_SETTER.test(setterName)) continue;
+      if (call.getArguments()[0]?.getText() !== 'true') continue;
+      // Debe haber al menos un await después de activar el loading dentro del try
+      if (call.getStart() >= lastAwaitPos) continue;
+
+      const resetPattern = new RegExp(`\\b${setterName}\\s*\\(\\s*false\\s*\\)`);
+      const finallyText = tryStmt.getFinallyBlock()?.getText() ?? '';
+      const catchText = tryStmt.getCatchClause()?.getBlock().getText() ?? '';
+      if (!resetPattern.test(finallyText) && !resetPattern.test(catchText)) {
+        facts.push({
+          kind: 'stuck-loading',
+          line: call.getStartLineNumber(),
+          params: { p0: setterName },
+        });
+      }
+    }
+  }
+
+  return facts;
+}
+
 export function collectCodeFacts(sf: SourceFile, limits: QualityLimits = {}): Fact[] {
   const resolved = { ...DEFAULT_LIMITS, ...limits };
-  return [...scrollViewMaps(sf), ...listProps(sf), ...largeFunctions(sf, resolved)]
-    .sort((a, b) => a.line - b.line);
+  return [
+    ...scrollViewMaps(sf),
+    ...listProps(sf),
+    ...largeFunctions(sf, resolved),
+    ...directFetchCalls(sf),
+    ...memoryLeaks(sf),
+    ...renderBottlenecks(sf),
+    ...runtimeSafety(sf),
+  ].sort((a, b) => a.line - b.line);
 }

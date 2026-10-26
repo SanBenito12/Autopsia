@@ -105,6 +105,13 @@ export function generateHtml(result: ScanResult): string {
   }
   header h1 { font-size: 16px; color: var(--ink); font-weight: 650; white-space: nowrap; }
   header .meta { color: var(--muted); font-size: 12px; }
+  .readiness-bar { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .r-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; padding: 2px 8px; border-radius: 5px;
+    background: var(--surface-2); border: 1px solid var(--hairline); color: var(--ink-2);
+  }
+  .r-pill i { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
   .health { display: flex; gap: 20px; flex-wrap: wrap; margin-left: auto; }
   .health .item { min-width: 130px; }
   .health .label {
@@ -249,6 +256,7 @@ export function generateHtml(result: ScanResult): string {
   <div>
     <h1>🔬 Autopsia</h1>
     <div class="meta" id="meta"></div>
+    <div class="readiness-bar" id="readiness"></div>
   </div>
   <div class="health" id="health"></div>
 </header>
@@ -320,6 +328,34 @@ const coveragePct = result.totalFiles === 0 ? 0 : Math.round(classifiedFiles / r
 document.getElementById('meta').textContent =
   result.root + ' · ' + result.totalFiles + ${JSON.stringify(t("viewer.filesCoverage"))} + coveragePct + '% · ' +
   new Date(result.scannedAt).toLocaleString('${getLocale()}');
+
+const readinessEl = document.getElementById('readiness');
+if (result.readiness && readinessEl) {
+  const verdictLabels = {
+    verified: ${JSON.stringify(t("report.verdict.verified"))},
+    partial: ${JSON.stringify(t("report.verdict.partial"))},
+    failing: ${JSON.stringify(t("report.verdict.failing"))},
+    unverified: ${JSON.stringify(t("report.verdict.unverified"))},
+  };
+  const phaseLabels = {
+    foundation: ${JSON.stringify(t("report.phase.foundation"))},
+    architecture: ${JSON.stringify(t("report.phase.architecture"))},
+    flows: ${JSON.stringify(t("report.phase.flows"))},
+    production: ${JSON.stringify(t("report.phase.production"))},
+  };
+  const vBadge = document.createElement('span');
+  vBadge.className = 'r-pill';
+  vBadge.textContent = verdictLabels[result.readiness.cleanArchVerdict] || result.readiness.cleanArchVerdict;
+  readinessEl.append(vBadge);
+  for (const p of result.readiness.phases || []) {
+    const pill = document.createElement('span');
+    pill.className = 'r-pill';
+    const dot = document.createElement('i');
+    dot.style.background = p.status === 'pass' ? 'var(--good)' : p.status === 'warn' ? 'var(--warning)' : 'var(--critical)';
+    pill.append(dot, document.createTextNode((phaseLabels[p.id] || p.id) + (p.issuesCount ? ' (' + p.issuesCount + ')' : '')));
+    readinessEl.append(pill);
+  }
+}
 
 const healthColor = (pct) => pct >= 90 ? 'var(--good)' : pct >= 70 ? 'var(--warning)' : 'var(--critical)';
 const healthEl = document.getElementById('health');

@@ -18,6 +18,7 @@ function presentResult(result: ScanResult, lang: Lang): ScanResult {
     ...result,
     violations: result.violations.map((v) => present(v, lang)),
     tolerated: result.tolerated?.map((v) => present(v, lang)),
+    configWarnings: result.configWarnings?.map((w) => present(w, lang)),
     analysis: result.analysis
       ? { ...result.analysis, issues: result.analysis.issues.map((i) => present(i, lang)) }
       : undefined,
@@ -58,6 +59,11 @@ function doctor(root: string, lang: Lang) {
       const shown = present(issue, lang);
       return { code: issue.code, file: issue.file, line: issue.line, message: shown.message, detail: shown.detail,
         recommendation: format(issue.recommendationCode, {}, lang) };
+    }),
+    warnings: report.warnings.map((w) => {
+      const shown = present(w, lang);
+      return { code: w.code, file: w.file, line: w.line, message: shown.message, detail: shown.detail,
+        recommendation: format(w.recommendationCode, {}, lang) };
     }),
   };
 }
