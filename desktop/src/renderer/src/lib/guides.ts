@@ -345,7 +345,82 @@ export function guideFor(lang: Lang, v: Violation): (Guide & { hint?: string }) 
       : v.rule === 'direct-data-access' && msg.includes('fetch()')
         ? directFetchHint[lang]
         : undefined;
+
+  if (msg.includes('keyboardavoidingview')) {
+    return {
+      ...guide,
+      hint,
+      badCode: `<View style={styles.form}>\n  <TextInput value={email} />\n  <TextInput value={password} />\n</View>`,
+      goodCode: `<KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>\n  <View style={styles.form}>\n    <TextInput value={email} />\n    <TextInput value={password} />\n  </View>\n</KeyboardAvoidingView>`,
+    };
+  }
+  if (msg.includes('condición de carrera') || msg.includes('race condition')) {
+    return {
+      ...guide,
+      hint,
+      badCode: `useEffect(() => {\n  const load = async () => {\n    const data = await fetchHistory();\n    setHistory(data);\n  };\n  void load();\n}, []);`,
+      goodCode: `useEffect(() => {\n  let cancelled = false;\n  const load = async () => {\n    const data = await fetchHistory();\n    if (!cancelled) setHistory(data);\n  };\n  void load();\n  return () => { cancelled = true; };\n}, []);`,
+    };
+  }
+  if (msg.includes('http://')) {
+    return {
+      ...guide,
+      hint,
+      badCode: `const API_URL = 'http://api.miapp.com/v1';`,
+      goodCode: `const API_URL = 'https://api.miapp.com/v1';`,
+    };
+  }
+
   return { ...guide, hint };
+}
+
+export function buildFindingAiPrompt(
+  lang: Lang,
+  root: string,
+  v: Violation,
+  snippetLines?: { num: number; text: string; active: boolean }[]
+): string {
+  const g = guideFor(lang, v);
+  const codeBlock =
+    snippetLines && snippetLines.length > 0
+      ? `\n\`\`\`tsx\n${snippetLines.map((l) => `${l.num}${l.active ? ' > ' : '   '}${l.text}`).join('\n')}\n\`\`\`\n`
+      : '';
+  if (lang === 'es') {
+    return [
+      `Corrige este hallazgo detectado por Autopsia en el proyecto \`${root}\`:`,
+      `- **Archivo**: \`${v.file}\`${v.line ? ` (línea ${v.line})` : ''}`,
+      `- **Regla**: \`${v.rule}\``,
+      `- **Problema**: ${v.message}${v.detail ? ` — ${v.detail}` : ''}`,
+      codeBlock,
+      g ? `**Cómo debe resolverse**:\n${g.fixes.map((f) => `- ${f}`).join('\n')}` : '',
+      g?.goodCode ? `\n**Patrón esperado**:\n\`\`\`tsx\n${g.goodCode}\n\`\`\`` : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
+  }
+  return [
+    `Fix this finding detected by Autopsia in project \`${root}\`:`,
+    `- **File**: \`${v.file}\`${v.line ? ` (line ${v.line})` : ''}`,
+    `- **Rule**: \`${v.rule}\``,
+    `- **Issue**: ${v.message}${v.detail ? ` — ${v.detail}` : ''}`,
+    codeBlock,
+    g ? `**How to fix**:\n${g.fixes.map((f) => `- ${f}`).join('\n')}` : '',
+    g?.goodCode ? `\n**Expected pattern**:\n\`\`\`tsx\n${g.goodCode}\n\`\`\`` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+export function buildStepAiPrompt(lang: Lang, root: string, stepTitle: string, violations: Violation[]): string {
+  const list = violations
+    .slice(0, 25)
+    .map((v) => `- \`${v.file}${v.line ? `:${v.line}` : ''}\` [\`${v.rule}\`]: ${v.message}${v.detail ? ` (${v.detail})` : ''}`)
+    .join('\n');
+  const more = violations.length > 25 ? `\n- ... (${violations.length - 25} more)` : '';
+  if (lang === 'es') {
+    return `En el proyecto \`${root}\`, corrige los siguientes hallazgos de **${stepTitle}** detectados por Autopsia sin romper la funcionalidad existente:\n\n${list}${more}`;
+  }
+  return `In project \`${root}\`, fix the following **${stepTitle}** findings detected by Autopsia without breaking existing behavior:\n\n${list}${more}`;
 }
 
 export function ignoreComment(lang: Lang, v: Violation): string {

@@ -555,3 +555,16 @@ code, .mono { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0; }
 .code-box.bad .code-label { color: var(--eosin); }
 .code-box.good .code-label { color: var(--clear); }
 .code-box pre { margin: 0; font-size: 11.5px; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
+
+.live-snippet {
+  margin: 12px 0; padding: 8px 10px; border-radius: 8px;
+  background: var(--slide); box-shadow: inset 0 0 0 1px var(--rule);
+  display: flex; flex-direction: column; gap: 6px;
+}
+.live-snippet .code-label { color: var(--ink-2); }
+.snippet-lines { display: flex; flex-direction: column; font-size: 11.5px; line-height: 1.45; overflow-x: auto; }
+.snippet-line { display: grid; grid-template-columns: 36px 1fr; gap: 8px; padding: 1px 6px; border-radius: 4px; }
+.snippet-line .ln { color: var(--muted); text-align: right; user-select: none; }
+.snippet-line .lt { white-space: pre; }
+.snippet-line.active { background: var(--eosin-soft); font-weight: 600; }
+.snippet-line.active .ln { color: var(--eosin); }

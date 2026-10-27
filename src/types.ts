@@ -125,7 +125,11 @@ export type CodeFactKind =
   | 'silent-catch'
   | 'stuck-loading'
   | 'state-mutation'
-  | 'insecure-token-storage';
+  | 'insecure-token-storage'
+  | 'cleartext-http'
+  | 'hardcoded-secret'
+  | 'async-effect-race'
+  | 'missing-keyboard-avoiding';
 
 export type CleanArchVerdict = 'verified' | 'partial' | 'unverified' | 'failing';
 

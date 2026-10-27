@@ -216,7 +216,7 @@ export function App() {
                     onChanged={() => runScan(root)} toast={toasts.push} />
                 ) : (
                   <Doctor
-                    t={t} lang={lang} root={root} data={data}
+                    t={t} lang={lang} root={root} data={data} toast={toasts.push}
                     onSelectFlow={(flow) => { setFlowFilter(flow); setCategoryFilter('all'); setTab('findings'); }}
                     onSelectCategory={(cat) => { setCategoryFilter(cat); setFlowFilter(null); setTab('findings'); }}
                   />

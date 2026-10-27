@@ -15,6 +15,7 @@ const api: AutopsiaApi = {
   exportHtml: invoke('exportHtml') as AutopsiaApi['exportHtml'],
   openInEditor: invoke('openInEditor') as AutopsiaApi['openInEditor'],
   revealInFinder: invoke('revealInFinder') as AutopsiaApi['revealInFinder'],
+  readSnippet: invoke('readSnippet') as AutopsiaApi['readSnippet'],
   takePendingOpen: invoke('takePendingOpen') as AutopsiaApi['takePendingOpen'],
   recents: invoke('recents') as AutopsiaApi['recents'],
   forgetRecent: invoke('forgetRecent') as AutopsiaApi['forgetRecent'],

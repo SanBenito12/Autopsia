@@ -3,6 +3,8 @@ import type { DoctorView, FeatureHealth, Lang, ReadinessPhase, RemediationStep, 
 import { api } from '../lib/api';
 import type { Key, T } from '../lib/i18n';
 import { displayPath } from '../lib/layers';
+import { buildStepAiPrompt } from '../lib/guides';
+import type { PushToast } from '../components/Toasts';
 import type { Category } from './Findings';
 
 const PHASE_LABELS: Record<ReadinessPhase['id'], { title: Key; desc: Key }> = {
@@ -25,6 +27,7 @@ export function Doctor({
   lang,
   root,
   data,
+  toast,
   onSelectFlow,
   onSelectCategory,
 }: {
@@ -32,6 +35,7 @@ export function Doctor({
   lang: Lang;
   root: string;
   data?: ScanOk | null;
+  toast?: PushToast;
   onSelectFlow?: (flow: string) => void;
   onSelectCategory?: (category: Category) => void;
 }) {
@@ -119,12 +123,17 @@ export function Doctor({
               {readiness.remediationPlan!.map((step: RemediationStep) => {
                 const meta = REMEDIATION_LABELS[step.id];
                 const badgeClass = step.priority === 'critical' ? 'error' : step.priority === 'high' ? 'warning' : 'ok';
+                const ruleSet = new Set(step.rules);
+                const allViolations = [...(data?.result.violations ?? []), ...(data?.result.tolerated ?? [])];
+                const stepViolations = allViolations.filter((v) => ruleSet.has(v.rule));
                 return (
-                  <button
+                  <div
                     key={step.id}
-                    type="button"
+                    role="button"
+                    tabIndex={0}
                     className="feature-row clickable"
                     onClick={() => onSelectCategory?.(meta.category)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSelectCategory?.(meta.category); }}
                   >
                     <div className="feature-main" style={{ gridColumn: '1 / 3' }}>
                       <span className="feature-name">{t(meta.title)}</span>
@@ -135,12 +144,23 @@ export function Doctor({
                         </span>
                       )}
                     </div>
-                    <div className="feature-status">
+                    <div className="feature-status" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <button
+                        type="button"
+                        className="btn quiet"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          await navigator.clipboard.writeText(buildStepAiPrompt(lang, root, t(meta.title), stepViolations));
+                          toast?.(t('copiedAiPrompt'), 'ok');
+                        }}
+                      >
+                        {t('copyStepAiPrompt', step.count)}
+                      </button>
                       <span className={`tag ${badgeClass}`}>
                         {t('remediationMeta', step.count, step.filesCount)}
                       </span>
                     </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>

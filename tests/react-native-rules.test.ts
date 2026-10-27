@@ -393,4 +393,103 @@ export function SafeLoginScreen({ items, bus }: { items: string[]; bus: { subscr
     const planIds = outcome.result.readiness?.remediationPlan?.map((s) => s.id) ?? [];
     expect(planIds).toEqual(['runtime-safety', 'memory-leak', 'render-bottleneck']);
   });
+
+  it('detects cleartext-http, hardcoded-secret, async-effect-race and missing-keyboard-avoiding without false positives', () => {
+    const cfg: AutopsiaConfig = {
+      layers: [
+        { name: 'presentation', patterns: ['src/presentation/*'], allowedDependencies: ['domain'] },
+        { name: 'domain', patterns: ['src/domain/*'], allowedDependencies: [] },
+        { name: 'data', patterns: ['src/data/*'], allowedDependencies: ['domain'] },
+      ],
+      dataAccessModules: ['axios'],
+      noDirectDataAccessIn: ['presentation'],
+    };
+    write('autopsia.config.json', JSON.stringify(cfg, null, 2));
+
+    // 1. Pantalla con formulario sin KeyboardAvoidingView + race condition en useEffect
+    write(
+      'src/presentation/screens/auth/ForgotPasswordModal.tsx',
+      `import React, { useEffect, useState } from 'react';
+import { TextInput, View } from 'react-native';
+
+export function ForgotPasswordModal({ fetchUser }: { fetchUser: () => Promise<string> }) {
+  const [email, setEmail] = useState('');
+  const [code, setCode] = useState('');
+
+  useEffect(() => {
+    const load = async () => {
+      const result = await fetchUser();
+      setEmail(result);
+    };
+    load();
+  }, [fetchUser]);
+
+  return (
+    <View>
+      <TextInput value={email} onChangeText={setEmail} />
+      <TextInput value={code} onChangeText={setCode} />
+    </View>
+  );
+}
+`
+    );
+
+    // 2. Servicio con http:// inseguro y API key hardcodeada
+    write(
+      'src/data/api/legacyClient.ts',
+      `export const LEGACY_ENDPOINT = 'http://api.production-app.com/v1/users';
+export const MAPS_KEY = 'AIzaSyD-9k3L8mN2pQ5rS7tU0vW1xY4zA6bC8dE';
+`
+    );
+
+    // 3. Pantalla segura con KeyboardAwareScreen, localhost http y cleanup flag
+    write(
+      'src/presentation/screens/auth/SafeRegisterScreen.tsx',
+      `import React, { useEffect, useState } from 'react';
+import { TextInput } from 'react-native';
+
+const KeyboardAwareScreen = ({ children }: any) => children;
+const DEV_URL = 'http://localhost:3000/health';
+
+export function SafeRegisterScreen({ fetchProfile }: { fetchProfile: () => Promise<string> }) {
+  const [name, setName] = useState(DEV_URL);
+  const [phone, setPhone] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      const res = await fetchProfile();
+      if (!cancelled) setName(res);
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchProfile]);
+
+  return (
+    <KeyboardAwareScreen>
+      <TextInput value={name} onChangeText={setName} />
+      <TextInput value={phone} onChangeText={setPhone} />
+    </KeyboardAwareScreen>
+  );
+}
+`
+    );
+
+    const outcome = scanProject(root);
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+
+    const modalViolations = outcome.result.violations.filter((v) => v.file.endsWith('ForgotPasswordModal.tsx'));
+    expect(modalViolations.map((v) => v.rule)).toContain('render-bottleneck');
+    expect(modalViolations.map((v) => v.rule)).toContain('runtime-safety');
+
+    const apiViolations = outcome.result.violations.filter((v) => v.file.endsWith('legacyClient.ts'));
+    expect(apiViolations.length).toBeGreaterThanOrEqual(2);
+    expect(apiViolations.every((v) => v.rule === 'runtime-safety')).toBe(true);
+
+    const safeViolations = outcome.result.violations.filter((v) => v.file.endsWith('SafeRegisterScreen.tsx'));
+    expect(safeViolations).toEqual([]);
+  });
 });

@@ -299,6 +299,21 @@ function renderBottlenecks(sf: SourceFile): Fact[] {
         }
       }
     }
+
+    // Pantallas o modales con >= 2 campos de texto sin KeyboardAvoidingView / KeyboardAware*
+    if (/(Screen|Modal)\.tsx$/i.test(filePath)) {
+      const inputElements = openings.filter((el) =>
+        /^(TextInput|InputUI|FormInput|CustomInput|PasswordInput|AuthInput)$/.test(tagOf(el))
+      );
+      const hasKeyboardWrapper = /KeyboardAvoidingView|KeyboardAware|BottomSheetTextInput/i.test(sf.getFullText());
+      if (inputElements.length >= 2 && !hasKeyboardWrapper) {
+        facts.push({
+          kind: 'missing-keyboard-avoiding',
+          line: inputElements[0].getStartLineNumber(),
+          params: { p0: String(inputElements.length) },
+        });
+      }
+    }
   }
 
   for (const call of sf.getDescendantsOfKind(SyntaxKind.CallExpression)) {
@@ -500,6 +515,84 @@ function runtimeSafety(sf: SourceFile): Fact[] {
           line: call.getStartLineNumber(),
           params: { p0: setterName },
         });
+      }
+    }
+  }
+
+  // 7. URLs http:// sin SSL (bloqueadas por iOS ATS / Android 9+) y llaves/secretos en duro
+  const stringNodes = [
+    ...sf.getDescendantsOfKind(SyntaxKind.StringLiteral),
+    ...sf.getDescendantsOfKind(SyntaxKind.NoSubstitutionTemplateLiteral),
+  ];
+  for (const strNode of stringNodes) {
+    const val = strNode.getLiteralValue();
+    if (
+      /^http:\/\/(?!localhost|127\.0\.0\.1|10\.0\.2\.2|192\.168\.|0\.0\.0\.0|schemas\.|www\.w3\.org)/i.test(
+        val
+      )
+    ) {
+      facts.push({
+        kind: 'cleartext-http',
+        line: strNode.getStartLineNumber(),
+        params: { p0: shorten(val) },
+      });
+    } else if (
+      /^(AIzaSy[A-Za-z0-9_-]{30,}|sk_live_[A-Za-z0-9]{20,}|rk_live_[A-Za-z0-9]{20,}|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,})$/.test(
+        val
+      )
+    ) {
+      facts.push({
+        kind: 'hardcoded-secret',
+        line: strNode.getStartLineNumber(),
+        params: { p0: `${val.slice(0, 12)}…` },
+      });
+    }
+  }
+
+  // 8. Condiciones de carrera en red/datos dentro de useEffect (await seguido de setState sin cleanup/AbortController)
+  for (const call of sf.getDescendantsOfKind(SyntaxKind.CallExpression)) {
+    const exprText = call.getExpression().getText();
+    if (exprText !== 'useEffect' && exprText !== 'React.useEffect') continue;
+    const arg0 = call.getArguments()[0];
+    if (!arg0 || (!Node.isArrowFunction(arg0) && !Node.isFunctionExpression(arg0))) continue;
+    const body = arg0.getBody();
+    if (!Node.isBlock(body)) continue;
+
+    const hasCleanupReturn = body
+      .getDescendantsOfKind(SyntaxKind.ReturnStatement)
+      .some(
+        (ret) =>
+          ret.getExpression() !== undefined &&
+          ret.getFirstAncestor((a) => Node.isFunctionLikeDeclaration(a)) === arg0
+      );
+    const effectText = body.getText();
+    if (hasCleanupReturn || /AbortController|abort\(|cancelled|canceled|isMounted|mounted|active/i.test(effectText)) {
+      continue;
+    }
+
+    const asyncFns = [
+      ...body.getDescendantsOfKind(SyntaxKind.ArrowFunction).filter((f) => f.isAsync()),
+      ...body.getDescendantsOfKind(SyntaxKind.FunctionExpression).filter((f) => f.isAsync()),
+      ...body.getDescendantsOfKind(SyntaxKind.FunctionDeclaration).filter((f) => f.isAsync()),
+    ];
+    for (const afn of asyncFns) {
+      const awaits = afn.getDescendantsOfKind(SyntaxKind.AwaitExpression);
+      if (awaits.length === 0) continue;
+      const firstAwaitStart = awaits[0].getStart();
+      // Solo reportar cuando el await invoca carga de red/datos/historial/casos de uso (no simples lecturas de permisos/flags locales)
+      const awaitText = awaits.map((a) => a.getText()).join(' ');
+      if (/isEnabled|getPermission|checkPermission|hasHardware|isEnrolled/i.test(awaitText)) continue;
+
+      const settersAfterAwait = afn
+        .getDescendantsOfKind(SyntaxKind.CallExpression)
+        .filter((c) => c.getStart() > firstAwaitStart && /^set[A-Z]\w*$/.test(c.getExpression().getText()));
+      if (settersAfterAwait.length > 0) {
+        facts.push({
+          kind: 'async-effect-race',
+          line: call.getStartLineNumber(),
+          params: { p0: settersAfterAwait[0].getExpression().getText() },
+        });
+        break;
       }
     }
   }

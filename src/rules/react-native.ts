@@ -25,6 +25,10 @@ const MESSAGES: Partial<Record<CodeFactKind, { rule: string; message: MessageKey
   'stuck-loading': { rule: 'runtime-safety', message: 'rule.stuckLoading', detail: 'rule.stuckLoadingHint' },
   'state-mutation': { rule: 'runtime-safety', message: 'rule.stateMutation', detail: 'rule.stateMutationHint' },
   'insecure-token-storage': { rule: 'runtime-safety', message: 'rule.insecureTokenStorage', detail: 'rule.insecureTokenStorageHint' },
+  'cleartext-http': { rule: 'runtime-safety', message: 'rule.cleartextHttp', detail: 'rule.cleartextHttpHint' },
+  'hardcoded-secret': { rule: 'runtime-safety', message: 'rule.hardcodedSecret', detail: 'rule.hardcodedSecretHint' },
+  'async-effect-race': { rule: 'runtime-safety', message: 'rule.asyncEffectRace', detail: 'rule.asyncEffectRaceHint' },
+  'missing-keyboard-avoiding': { rule: 'render-bottleneck', message: 'rule.missingKeyboardAvoiding', detail: 'rule.missingKeyboardAvoidingHint' },
 };
 
 export function checkCodeFacts(nodes: FileNode[], rule: string): Violation[] {

@@ -208,6 +208,10 @@ const es = {
   codeExampleTitle: 'Ejemplo de corrección (Antes vs. Después)',
   codeBadLabel: '❌ Cómo está mal (causa el problema)',
   codeGoodLabel: '✅ Cómo debe quedar (listo para producción)',
+  liveSnippetTitle: 'Código actual en tu proyecto',
+  copyAiPrompt: '✨ Copiar prompt para IA',
+  copyStepAiPrompt: '✨ Copiar prompt del paso ({0})',
+  copiedAiPrompt: 'Prompt para IA copiado al portapapeles. Pégalo en tu asistente para corregirlo.',
 };
 
 const en: typeof es = {
@@ -418,6 +422,10 @@ const en: typeof es = {
   codeExampleTitle: 'Fix example (Before vs. After)',
   codeBadLabel: '❌ Problematic pattern',
   codeGoodLabel: '✅ Production-ready fix',
+  liveSnippetTitle: 'Current code in your project',
+  copyAiPrompt: '✨ Copy AI fix prompt',
+  copyStepAiPrompt: '✨ Copy step AI prompt ({0})',
+  copiedAiPrompt: 'AI fix prompt copied to clipboard. Paste it into your assistant to fix it.',
 };
 
 export type Key = keyof typeof es;

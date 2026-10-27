@@ -167,6 +167,23 @@ function registerIpc(): void {
   ipcMain.handle('revealInFinder', (_e, target: string) => {
     if (fs.existsSync(target)) shell.showItemInFolder(target);
   });
+  ipcMain.handle('readSnippet', (_e, root: string, file: string, line?: number) => {
+    try {
+      const abs = path.resolve(root, file);
+      if (!abs.startsWith(path.resolve(root)) || !fs.existsSync(abs)) return null;
+      const allLines = fs.readFileSync(abs, 'utf-8').split(/\r?\n/);
+      const targetLine = Math.max(1, Math.min(allLines.length, line ?? 1));
+      const start = Math.max(1, targetLine - 5);
+      const end = Math.min(allLines.length, targetLine + 5);
+      const lines = [];
+      for (let n = start; n <= end; n++) {
+        lines.push({ num: n, text: allLines[n - 1] ?? '', active: n === targetLine });
+      }
+      return { lines };
+    } catch {
+      return null;
+    }
+  });
   ipcMain.handle('recents', () => listRecents());
   ipcMain.handle('takePendingOpen', () => takePendingOpen());
   ipcMain.handle('forgetRecent', (_e, root: string) => forgetRecent(root));

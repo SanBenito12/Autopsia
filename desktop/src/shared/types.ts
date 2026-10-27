@@ -87,6 +87,16 @@ export interface InitPreview {
   coverage: { totalFiles: number; classifiedFiles: number; percent: number; unclassifiedExamples: string[] };
 }
 
+export interface CodeSnippetLine {
+  num: number;
+  text: string;
+  active: boolean;
+}
+
+export interface CodeSnippet {
+  lines: CodeSnippetLine[];
+}
+
 export type EngineResult<T> = { ok: true; value: T } | { ok: false; message: string };
 
 export interface AutopsiaApi {
@@ -101,6 +111,7 @@ export interface AutopsiaApi {
   exportHtml(root: string, lang: Lang): Promise<EngineResult<string | null>>;
   openInEditor(root: string, file: string, line?: number): Promise<void>;
   revealInFinder(target: string): Promise<void>;
+  readSnippet(root: string, file: string, line?: number): Promise<CodeSnippet | null>;
   takePendingOpen(): Promise<string | null>;
   recents(): Promise<RecentProject[]>;
   forgetRecent(root: string): Promise<RecentProject[]>;

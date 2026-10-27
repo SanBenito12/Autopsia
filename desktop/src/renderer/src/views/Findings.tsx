@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { Lang, ReportComparison, ScanOk, Violation } from '@shared/types';
+import type { CodeSnippet, Lang, ReportComparison, ScanOk, Violation } from '@shared/types';
 import { api } from '../lib/api';
 import { ruleName, type T } from '../lib/i18n';
 import { basename, dirname, displayPath } from '../lib/layers';
 import type { PushToast } from '../components/Toasts';
-import { guideFor, ignoreComment, rulesDocUrl } from '../lib/guides';
+import { buildFindingAiPrompt, guideFor, ignoreComment, rulesDocUrl } from '../lib/guides';
 
 type Filter = 'all' | 'new' | 'tolerated';
 export type Category = 'all' | 'arch' | 'perf' | 'safety' | 'ui';
@@ -219,9 +219,28 @@ export function Findings({
 function Detail({ t, lang, item, root, toast }: { t: T; lang: Lang; item: Item; root: string; toast: PushToast }) {
   const { v, tolerated } = item;
   const guide = guideFor(lang, v);
+  const [snippet, setSnippet] = useState<CodeSnippet | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    setSnippet(null);
+    if (api.readSnippet) {
+      api.readSnippet(root, v.file, v.line).then((res) => {
+        if (active) setSnippet(res);
+      });
+    }
+    return () => {
+      active = false;
+    };
+  }, [root, v.file, v.line]);
+
   const copyIgnore = async () => {
     await navigator.clipboard.writeText(ignoreComment(lang, v));
     toast(t('copied', v.line ?? 1));
+  };
+  const copyAi = async () => {
+    await navigator.clipboard.writeText(buildFindingAiPrompt(lang, root, v, snippet?.lines));
+    toast(t('copiedAiPrompt'), 'ok');
   };
   const chain = v.rule === 'circular-deps' && v.detail?.includes(' → ') ? v.detail.split(' → ') : null;
   return (
@@ -240,8 +259,22 @@ function Detail({ t, lang, item, root, toast }: { t: T; lang: Lang; item: Item; 
           <ol className="chain mono">{chain.map((step, i) => <li key={i}>{step}</li>)}</ol>
         </>
       ) : v.detail ? <p className="sub">{v.detail}</p> : null}
+      {snippet && snippet.lines.length > 0 && (
+        <div className="live-snippet">
+          <span className="code-label">{t('liveSnippetTitle')}</span>
+          <div className="snippet-lines mono">
+            {snippet.lines.map((l) => (
+              <div key={l.num} className={`snippet-line ${l.active ? 'active' : ''}`}>
+                <span className="ln">{l.num}</span>
+                <span className="lt">{l.text || ' '}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="actions">
         <button className="btn primary" onClick={() => api.openInEditor(root, v.file, v.line)}>{t('openInEditor')}</button>
+        <button className="btn" onClick={copyAi}>{t('copyAiPrompt')}</button>
         <button className="btn" onClick={() => api.revealInFinder(`${root}/${v.file}`)}>{t('reveal')}</button>
       </div>
       {guide && (
