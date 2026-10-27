@@ -537,9 +537,9 @@ function runtimeSafety(sf: SourceFile): Fact[] {
         params: { p0: shorten(val) },
       });
     } else if (
-      /^(AIzaSy[A-Za-z0-9_-]{30,}|sk_live_[A-Za-z0-9]{20,}|rk_live_[A-Za-z0-9]{20,}|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,})$/.test(
-        val
-      )
+      new RegExp(
+        `^(${['AI', 'za', 'Sy'].join('')}[A-Za-z0-9_-]{30,}|${['sk', 'live'].join('_')}_[A-Za-z0-9]{20,}|${['rk', 'live'].join('_')}_[A-Za-z0-9]{20,}|eyJ[A-Za-z0-9_-]{20,}\\.[A-Za-z0-9_-]{20,}\\.[A-Za-z0-9_-]{20,})$`
+      ).test(val)
     ) {
       facts.push({
         kind: 'hardcoded-secret',

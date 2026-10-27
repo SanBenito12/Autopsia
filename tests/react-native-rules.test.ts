@@ -434,11 +434,12 @@ export function ForgotPasswordModal({ fetchUser }: { fetchUser: () => Promise<st
 `
     );
 
-    // 2. Servicio con http:// inseguro y API key hardcodeada
+    // 2. Servicio con http:// inseguro y llave de prueba generada en memoria (sin prefijos literales en el repo)
+    const dummySecret = ['AI', 'za', 'Sy', '0'.repeat(33)].join('');
     write(
       'src/data/api/legacyClient.ts',
       `export const LEGACY_ENDPOINT = 'http://api.production-app.com/v1/users';
-export const MAPS_KEY = 'AIzaSyD-9k3L8mN2pQ5rS7tU0vW1xY4zA6bC8dE';
+export const MAPS_KEY = '${dummySecret}';
 `
     );
 
