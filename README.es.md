@@ -13,6 +13,37 @@ Autopsia comprueba dependencias TypeScript y el AST contra reglas de arquitectur
 
 [ Descargar App macOS (.dmg — Apple Silicon)](https://github.com/SanBenito12/Autopsia/releases/latest/download/Autopsia-0.1.0-arm64.dmg) · [ Descargar App macOS (.dmg — Intel)](https://github.com/SanBenito12/Autopsia/releases/latest/download/Autopsia-0.1.0.dmg) · [Demo interactiva](https://sanbenito12.github.io/Autopsia/report.es.html) · [Guía inicial](https://github.com/SanBenito12/Autopsia/blob/main/docs/getting-started.es.md)
 
+## 💻 Instalar la App de Escritorio (macOS)
+
+### 1. ¿Cuál `.dmg` descargo?
+
+| Tu Mac | Archivo a descargar |
+| :--- | :--- |
+| **Chip Apple** (M1, M2, M3, M4 — casi todas las Mac desde finales de 2020) | **[`Autopsia-0.1.0-arm64.dmg`](https://github.com/SanBenito12/Autopsia/releases/latest/download/Autopsia-0.1.0-arm64.dmg)** ✅ recomendado |
+| **Procesador Intel** (Mac más antiguas) | [`Autopsia-0.1.0.dmg`](https://github.com/SanBenito12/Autopsia/releases/latest/download/Autopsia-0.1.0.dmg) |
+
+**¿No sabes cuál tienes?** Menú  → **Acerca de esta Mac**. Si en *Chip* dice **Apple M…**, baja el `arm64`. Si en *Procesador* dice **Intel**, baja el otro. (En Terminal: `uname -m` → `arm64` = Apple, `x86_64` = Intel).
+
+### 2. Instalar
+
+1. Abre el `.dmg` descargado.
+2. Arrastra **Autopsia** a la carpeta **Aplicaciones** (si ya tenías una versión anterior, elige **Reemplazar**).
+3. Expulsa el disco de Autopsia en Finder.
+
+### 3. Primera apertura (aviso de seguridad de macOS)
+
+La app aún no está firmada con un certificado de Apple Developer, así que macOS puede decir *"no se puede abrir porque Apple no puede verificarla"*. Es normal; para abrirla:
+
+- **Opción A:** en **Aplicaciones**, haz **clic derecho sobre Autopsia → Abrir** y confirma con **Abrir**.
+- **Opción B:** ve a **Ajustes del Sistema → Privacidad y seguridad**, baja hasta el mensaje sobre Autopsia y pulsa **Abrir de todos modos**.
+- **Opción C (Terminal):** `xattr -dr com.apple.quarantine /Applications/Autopsia.app`
+
+Solo es necesario la primera vez.
+
+### 4. Uso
+
+Pulsa **Abrir proyecto**, elige la carpeta raíz de tu app React Native y Autopsia mostrará el veredicto de Clean Architecture, las 4 fases hacia producción, el plan de acción y cada hallazgo con el código real y un botón **✨ Copiar prompt para IA**.
+
 ## Inicio Rápido (Comandos Cero Fricción)
 
 Requiere Node 18+. Desde la raíz de tu proyecto:

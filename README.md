@@ -15,6 +15,37 @@ Autopsia checks your TypeScript dependencies and AST against Clean Architecture 
 
 ![Actual CLI output from the public sample fixture](https://raw.githubusercontent.com/SanBenito12/Autopsia/main/docs/demo.png)
 
+## 💻 Install the Desktop App (macOS)
+
+### 1. Which `.dmg` should I download?
+
+| Your Mac | File to download |
+| :--- | :--- |
+| **Apple chip** (M1, M2, M3, M4 — nearly every Mac since late 2020) | **[`Autopsia-0.1.0-arm64.dmg`](https://github.com/SanBenito12/Autopsia/releases/latest/download/Autopsia-0.1.0-arm64.dmg)** ✅ recommended |
+| **Intel processor** (older Macs) | [`Autopsia-0.1.0.dmg`](https://github.com/SanBenito12/Autopsia/releases/latest/download/Autopsia-0.1.0.dmg) |
+
+**Not sure?** Apple menu  → **About This Mac**. If *Chip* says **Apple M…**, get the `arm64` file. If *Processor* says **Intel**, get the other one. (Terminal: `uname -m` → `arm64` = Apple, `x86_64` = Intel.)
+
+### 2. Install
+
+1. Open the downloaded `.dmg`.
+2. Drag **Autopsia** into **Applications** (choose **Replace** if you had an older version).
+3. Eject the Autopsia disk in Finder.
+
+### 3. First launch (macOS security prompt)
+
+The app is not yet signed with an Apple Developer certificate, so macOS may say *"cannot be opened because Apple cannot verify it"*. This is expected; to open it:
+
+- **Option A:** in **Applications**, **right-click Autopsia → Open**, then confirm **Open**.
+- **Option B:** go to **System Settings → Privacy & Security**, scroll to the Autopsia message and click **Open Anyway**.
+- **Option C (Terminal):** `xattr -dr com.apple.quarantine /Applications/Autopsia.app`
+
+You only need to do this once.
+
+### 4. Use it
+
+Click **Open project**, pick your React Native app's root folder, and Autopsia shows the Clean Architecture verdict, the 4 readiness phases, the action plan, and every finding with the real code and a **✨ Copy AI fix prompt** button.
+
 ## Quickstart (Zero-Friction Commands)
 
 Requires Node 18+. Run from your project root:
