@@ -14,7 +14,10 @@ mac:
     - target: dmg
       arch: [arm64, x64]
   icon: build/icon.icns
-  identity: null
+  # Firma ad-hoc ("-"): sin certificado de Apple Developer, pero sella todo el
+  # bundle. Con `null` la firma queda rota y macOS muestra "la app está dañada".
+  identity: "-"
+  hardenedRuntime: false
   extendInfo:
     CFBundleDocumentTypes:
       - CFBundleTypeName: Folder

@@ -38,7 +38,9 @@ The app is not yet signed with an Apple Developer certificate, so macOS may say 
 
 - **Option A:** in **Applications**, **right-click Autopsia → Open**, then confirm **Open**.
 - **Option B:** go to **System Settings → Privacy & Security**, scroll to the Autopsia message and click **Open Anyway**.
-- **Option C (Terminal):** `xattr -dr com.apple.quarantine /Applications/Autopsia.app`
+- **Option C (Terminal):** `xattr -cr /Applications/Autopsia.app`
+
+> **Does it say "Autopsia is damaged and should be moved to the Trash"?** It isn't damaged — that's macOS quarantine blocking a downloaded app that isn't notarized. Click Cancel (don't trash it), run **Option C** in Terminal, then open it again.
 
 You only need to do this once.
 

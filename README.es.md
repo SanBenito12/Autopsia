@@ -36,7 +36,9 @@ La app aún no está firmada con un certificado de Apple Developer, así que mac
 
 - **Opción A:** en **Aplicaciones**, haz **clic derecho sobre Autopsia → Abrir** y confirma con **Abrir**.
 - **Opción B:** ve a **Ajustes del Sistema → Privacidad y seguridad**, baja hasta el mensaje sobre Autopsia y pulsa **Abrir de todos modos**.
-- **Opción C (Terminal):** `xattr -dr com.apple.quarantine /Applications/Autopsia.app`
+- **Opción C (Terminal):** `xattr -cr /Applications/Autopsia.app`
+
+> **¿Dice que "Autopsia está dañada y debería moverse a la papelera"?** No está dañada: es el bloqueo de cuarentena de macOS para apps descargadas sin notarizar. Cancela (no la borres), ejecuta la **Opción C** en Terminal y ábrela de nuevo.
 
 Solo es necesario la primera vez.
 
